@@ -321,54 +321,6 @@ public class KnowledgeBaseConnector {
 		return sortedResult;
 	}
 	
-	Collection<ComparablePair<Property, Float>> getPropertyCandidates(String name, String subjectType, String objectType) {
-		Resource subjectClass = null;
-		Resource objectClass = null;
-		if (subjectType != null) {
-			subjectClass = getResource(subjectType);
-		}
-		if (objectType != null) {
-			objectClass = getResource(objectType);
-		}
-		String nameLC = name.toLowerCase();
-//		String pos = null;
-		if (nameLC.contains("#")) {
-			int sepIndex = nameLC.indexOf('#');
-//			pos = nameLC.substring(sepIndex + 1);
-			nameLC = nameLC.substring(0, sepIndex);
-		}
-		List<ComparablePair<Property, Float>> result = new LinkedList<ComparablePair<Property, Float>>();
-		ExtendedIterator<OntProperty> props = ontModel.listAllOntProperties();
-		while (props.hasNext()) {
-			OntProperty p = props.next();
-			String pName = p.getLocalName().toLowerCase();
-			if (pName.contains(nameLC)) {
-				OntClass domain = p.getDomain() != null ? p.getDomain().asClass() : null;
-				OntClass range = p.getRange() != null ? p.getRange().asClass() : null;
-				if (domain != null && subjectClass != null) {
-//					System.out.println("domain: " + (domain.hasSubClass(subjectClass) || domain.equals(subjectClass)));
-					if (!domain.hasSubClass(subjectClass) && !domain.equals(subjectClass)) {
-						continue;
-					}
-				}
-				if (range != null && objectClass != null) {
-//					System.out.println("range: " + (range.hasSubClass(objectClass) || range.equals(objectClass)));
-					if (!range.hasSubClass(objectClass) && !range.equals(objectClass)) {
-						continue;
-					}
-				}
-				float score = (float)nameLC.length() / pName.length();
-				result.add(new ComparablePair<Property, Float>(p, score));
-			}
-		}
-		int numResults = Math.min(result.size(), 10);
-		List<ComparablePair<Property, Float>> sortedResult = result.subList(0, numResults);
-		Collections.sort(sortedResult);
-		System.out.println("Done searching props.");
-		
-		return sortedResult;
-	}
-	
 	public void close() {
 		System.out.println("Closing KB Connector. Number of queries: " + numQueries);
 		data.end();

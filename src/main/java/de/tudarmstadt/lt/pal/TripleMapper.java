@@ -59,25 +59,6 @@ public class TripleMapper {
 		return candidates;
 	}
 	
-	private Collection<ComparablePair<Property, Float>> mapProperty(SPARQLTriple triple) {
-		SPARQLTriple.Element p = triple.predicate;
-		Collection<ComparablePair<Property, Float>> candidates = new LinkedList<ComparablePair<Property, Float>>();
-		
-		if (p instanceof SPARQLTriple.Constant) {
-			SPARQLTriple.Constant c = (SPARQLTriple.Constant)p;
-			// Wildcard (something like "*")
-			if (c.name.equals("[]")) {
-				return null;
-			}
-			if (c.type == SPARQLTriple.ConstantType.MappedConstantType) {
-				candidates = Collections.singleton(new ComparablePair<Property, Float>(kb.getProperty(p.name), 1.0f));
-			} else {
-				candidates = kb.getPropertyCandidates(p.name, triple.subject.type, triple.object.type);
-			}
-		}
-		return candidates;
-	}
-	
 	public String buildSPARQLQuery(PseudoQuery pseudoQuery) {
 		System.out.println("Building sparql query for pseudo query:");
 		System.out.println(pseudoQuery);
