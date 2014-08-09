@@ -1,4 +1,4 @@
-package de.tudarmstast.lt.pal.stanford;
+package de.tudarmstadt.lt.pal.stanford;
 import edu.stanford.nlp.ling.IndexedWord;
 
 /**

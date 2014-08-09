@@ -25,7 +25,6 @@ import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
 import com.hp.hpl.jena.reasoner.ReasonerRegistry;
 import com.hp.hpl.jena.tdb.TDBFactory;
-import com.hp.hpl.jena.util.iterator.ExtendedIterator;
 import com.hp.hpl.jena.vocabulary.RDF;
 
 import de.tudarmstadt.lt.pal.util.ComparablePair;
@@ -70,7 +69,7 @@ public class KnowledgeBaseConnector {
 	
 	private QueryExecution getQueryExec(String query) {
 		numQueries++;
-		System.out.println("QUERY " + query);
+//		System.out.println("QUERY " + query);
 		query = SPARQL_PREFIXES + "\n" + query;
 		QueryExecution qexec;
 		if (sparqlEndpoint != null) {
@@ -208,11 +207,12 @@ public class KnowledgeBaseConnector {
 		System.out.println("Searching resources... [" + name + "]");
 		if (name.contains("#")) {
 			int sepIndex = name.indexOf('#');
-			name = name.substring(0, sepIndex - 1);
+			name = name.substring(0, sepIndex);
 		}
 		List<ComparablePair<Resource, Float>> result = new LinkedList<ComparablePair<Resource, Float>>();
 		{
-			String queryString = "SELECT DISTINCT ?subject ?name WHERE { ?subject <http://xmlns.com/foaf/0.1/name> ?name . "
+			String queryString = "SELECT DISTINCT ?subject ?name WHERE { "
+				               + "{ ?subject foaf:name ?name } UNION { ?subject rdfs:label ?name } "
 					           + "FILTER(contains (?name,\"" + name + "\")) } LIMIT " + limit;
 			QueryExecution qexec = getQueryExec(queryString);
 			try {
@@ -223,7 +223,10 @@ public class KnowledgeBaseConnector {
 					String rName = soln.getLiteral("name").getString();
 					Resource r = soln.getResource("subject");
 					if (r != null) {
-						result.add(new ComparablePair<Resource, Float>(r, (float)name.length() / rName.length()));
+						float labelScore = (float)name.length() / rName.length();
+						float resourceNameScore = 1.0f - (float)Math.abs(r.getLocalName().length() - name.length()) / r.getLocalName().length();
+						float comboScore = labelScore * 0.5f + resourceNameScore * 0.5f;
+						result.add(new ComparablePair<Resource, Float>(r, comboScore));
 					}
 				}
 			} finally { qexec.close(); }
@@ -265,16 +268,10 @@ public class KnowledgeBaseConnector {
 		return res;
 	}
 	
-	Collection<ComparablePair<Property, Float>> getPropertyCandidates(String name, Resource subject, Resource object) {
+	Collection<ComparablePair<Property, Float>> getPropertyCandidates(Collection<ComparablePair<String, Float>> nameCandidates, Resource subject, Resource object) {
+//		System.out.println("=============");
 		Resource subjectClass = subject != null ? ontModel.getOntClass(subject.getURI()) : null;
 		Resource objectClass = object != null ? ontModel.getOntClass(object.getURI()) : null;
-		String nameLC = name.toLowerCase();
-//		String pos = null;
-		if (nameLC.contains("#")) {
-			int sepIndex = nameLC.indexOf('#');
-//			pos = nameLC.substring(sepIndex + 1);
-			nameLC = nameLC.substring(0, sepIndex);
-		}
 		
 		String querySubject = subjectClass == null && subject != null ? "<" + subject + ">": "?s";
 		String queryObject = objectClass == null && object != null ? "<" + object + ">": "?o";
@@ -294,31 +291,34 @@ public class KnowledgeBaseConnector {
 				continue;
 			}
 			String pName = p.getLocalName().toLowerCase();
-			if (pName.contains(nameLC)) {
-				OntClass domain = p.getDomain() != null ? p.getDomain().asClass() : null;
-				OntClass range = p.getRange() != null ? p.getRange().asClass() : null;
-				if (domain != null && subjectClass != null) {
-//					System.out.println("domain: " + (domain.hasSubClass(subjectClass) || domain.equals(subjectClass)));
-					if (!domain.hasSubClass(subjectClass) && !domain.equals(subjectClass)) {
-						continue;
+//			System.out.println("[" + p + "]");
+			for (ComparablePair<String, Float> candidate : nameCandidates) {
+				if (pName.startsWith(candidate.key)) {
+//					System.out.println("[" + pName + "] matches " + candidate.key);
+					OntClass domain = p.getDomain() != null ? p.getDomain().asClass() : null;
+					OntClass range = p.getRange() != null ? p.getRange().asClass() : null;
+					if (domain != null && subjectClass != null) {
+	//					System.out.println("domain: " + (domain.hasSubClass(subjectClass) || domain.equals(subjectClass)));
+						if (!domain.hasSubClass(subjectClass) && !domain.equals(subjectClass)) {
+							continue;
+						}
 					}
-				}
-				if (range != null && objectClass != null) {
-//					System.out.println("range: " + (range.hasSubClass(objectClass) || range.equals(objectClass)));
-					if (!range.hasSubClass(objectClass) && !range.equals(objectClass)) {
-						continue;
+					if (range != null && objectClass != null) {
+	//					System.out.println("range: " + (range.hasSubClass(objectClass) || range.equals(objectClass)));
+						if (!range.hasSubClass(objectClass) && !range.equals(objectClass)) {
+							continue;
+						}
 					}
+					float score = (float)candidate.key.length() / pName.length() * candidate.value;
+					result.add(new ComparablePair<Property, Float>(p, score));
 				}
-				float score = (float)nameLC.length() / pName.length();
-				result.add(new ComparablePair<Property, Float>(p, score));
 			}
 		}
+		Collections.sort(result);
 		int numResults = Math.min(result.size(), 10);
-		List<ComparablePair<Property, Float>> sortedResult = result.subList(0, numResults);
-		Collections.sort(sortedResult);
-		System.out.println("Done searching props.");
+//		System.out.println("Done searching props.");
 		
-		return sortedResult;
+		return result.subList(0, numResults);
 	}
 	
 	public void close() {

@@ -1,4 +1,4 @@
-package de.tudarmstast.lt.pal.stanford;
+package de.tudarmstadt.lt.pal.stanford;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -42,10 +42,10 @@ public class StanfordPseudoQueryBuilder {
 			String type = var.lemma();
 			switch (type.toLowerCase()) {
 			case "who":
-				type = "dbpedia-owl:Agent";
+				type = "<http://dbpedia.org/ontology/Agent>";
 				break;
 			case "where":
-				type = "dbpedia-owl:Place";
+				type = "<http://dbpedia.org/ontology/Place>";
 				break;
 			case "when":
 				type = "xsd:date";
@@ -78,6 +78,16 @@ public class StanfordPseudoQueryBuilder {
 		return var;
 	}
 	
+	private static String getNodeText(SemanticGraph deps, IndexedWord word) {
+		String resStr = "";
+		for (IndexedWord child : deps.getChildren(word)) {
+//			List<SemanticGraphEdge> edges = deps.getAllEdges(word, child);
+			resStr += getNodeText(deps, child);
+		}
+		resStr += word.value();
+		return resStr;
+	}
+	
 	static SPARQLTriple.Element nodeToSPARQLElement(SemanticGraph deps, Object node, Map<IndexedWord, SPARQLTriple.Variable> variables) {
 		SPARQLTriple.Element res = null;
 		if (node instanceof String) {
@@ -86,8 +96,10 @@ public class StanfordPseudoQueryBuilder {
 			String resStr = "";
 			IndexedWord word = (IndexedWord)node;
 			
-			// proper noun --> leaf element (e.g. "Orhan Pamuk")
-			if (word.tag().startsWith("NNP")) {
+			if (word.tag().startsWith("N")) {
+				resStr = getNodeText(deps, word);
+				res = new SPARQLTriple.Constant(resStr, SPARQLTriple.ConstantType.UnmappedConstantType);
+			} /*if (word.tag().startsWith("NNP")) {
 				for (IndexedWord child : deps.getChildren(word)) {
 					List<SemanticGraphEdge> edges = deps.getAllEdges(word, child);
 					for (SemanticGraphEdge e : edges) {
@@ -99,13 +111,13 @@ public class StanfordPseudoQueryBuilder {
 				}
 				resStr += word.value();
 				res = new SPARQLTriple.Constant(resStr, SPARQLTriple.ConstantType.UnmappedConstantType);
-			} else if (word.tag().startsWith("NN")) {
+			} */else if (word.tag().startsWith("NN")) {
 				res = registerVariable(variables, word, word.lemma());
 			} else if (word.tag().startsWith("W")) {
 				if (word.value().toLowerCase().equals("who")) {
-					res = registerVariable(variables, word, "dbpedia-owl:Agent");
+					res = registerVariable(variables, word, "<http://dbpedia.org/ontology/Agent>");
 				} else if (word.value().toLowerCase().equals("where")) {
-					res = registerVariable(variables, word, "dbpedia-owl:Place");
+					res = registerVariable(variables, word, "<http://dbpedia.org/ontology/Place>");
 				}
 			} else {
 				res = new SPARQLTriple.Constant(word.value(), SPARQLTriple.ConstantType.UnmappedConstantType);

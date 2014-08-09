@@ -8,8 +8,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-import de.tudarmstast.lt.pal.stanford.StanfordDependencyParser;
-import de.tudarmstast.lt.pal.stanford.StanfordPseudoQueryBuilder;
+import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
+import de.tudarmstadt.lt.pal.stanford.StanfordPseudoQueryBuilder;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 
 /**

@@ -18,8 +18,8 @@ import org.xml.sax.SAXException;
 
 import de.tudarmstadt.lt.pal.KnowledgeBaseConnector;
 import de.tudarmstadt.lt.pal.PseudoQuery;
-import de.tudarmstast.lt.pal.stanford.StanfordDependencyParser;
-import de.tudarmstast.lt.pal.stanford.StanfordPseudoQueryBuilder;
+import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
+import de.tudarmstadt.lt.pal.stanford.StanfordPseudoQueryBuilder;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 

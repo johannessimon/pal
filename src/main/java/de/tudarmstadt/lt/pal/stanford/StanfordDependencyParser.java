@@ -1,4 +1,4 @@
-package de.tudarmstast.lt.pal.stanford;
+package de.tudarmstadt.lt.pal.stanford;
 
 import java.util.List;
 import java.util.Properties;

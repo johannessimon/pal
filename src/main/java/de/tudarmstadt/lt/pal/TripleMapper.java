@@ -1,13 +1,16 @@
 package de.tudarmstadt.lt.pal;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
 import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.Resource;
 
 import de.tudarmstadt.lt.pal.util.ComparablePair;
+import de.tudarmstadt.lt.pal.wordnet.WordNetConnector;
 
 /**
  * Maps pseudo-query triples to valid DBPedia triples.<br/>
@@ -16,6 +19,7 @@ import de.tudarmstadt.lt.pal.util.ComparablePair;
  */
 public class TripleMapper {
 	KnowledgeBaseConnector kb;
+	WordNetConnector wnc = new WordNetConnector("/Users/jsimon/No-Backup/wordnet31/dict");
 	
 	public TripleMapper(KnowledgeBaseConnector kb) {
 		this.kb = kb;
@@ -29,9 +33,9 @@ public class TripleMapper {
 			if (c.type == SPARQLTriple.ConstantType.MappedConstantType) {
 				candidates = Collections.singletonList(new ComparablePair<Resource, Float>(kb.getResource(e.name), 1.0f));
 			} else {
-				// Get scores for 100 resource candidates and choose best 10
+				// Get scores for 100 resource candidates and choose best 50
 				int numCandidates = 100;
-				int numCandidatesFiltered = 10;
+				int numCandidatesFiltered = 50;
 				candidates = kb.getResourceCandidates(e.name, numCandidates);
 				if (candidates.size() > numCandidatesFiltered) {
 					candidates = candidates.subList(0, numCandidatesFiltered);
@@ -53,7 +57,17 @@ public class TripleMapper {
 			if (c.type == SPARQLTriple.ConstantType.MappedConstantType) {
 				candidates = Collections.singleton(new ComparablePair<Property, Float>(kb.getProperty(p.name), 1.0f));
 			} else {
-				candidates = kb.getPropertyCandidates(p.name, subject, object);
+				String nameLC = p.name.toLowerCase();
+				Set<ComparablePair<String, Float>> synonyms = new HashSet<ComparablePair<String, Float>>();
+				String pos = null;
+				if (nameLC.contains("#")) {
+					int sepIndex = nameLC.indexOf('#');
+					pos = nameLC.substring(sepIndex + 1);
+					nameLC = nameLC.substring(0, sepIndex);
+					synonyms.addAll(wnc.getSynonyms(nameLC, pos));
+				}
+				synonyms.add(new ComparablePair<String, Float>(nameLC, 1.0f));
+				candidates = kb.getPropertyCandidates(synonyms, subject, object);
 			}
 		}
 		return candidates;
@@ -82,9 +96,14 @@ public class TripleMapper {
 		for (SPARQLTriple t : pseudoQuery.triples) {
 			tripleIndex++;
 			
+			String subjectType = t.subject.type;
+			String objectType = t.object.type;
 			String tripleQuery = buildSPARQLTriple(t, tripleIndex);
 			// Try again with subject and object swapped
 			if (tripleQuery == null) {
+				// Restore types
+				t.subject.type = subjectType;
+				t.object.type = objectType;
 				SPARQLTriple.Element oldSubject = t.subject;
 				t.subject = t.object;
 				t.object = oldSubject;
