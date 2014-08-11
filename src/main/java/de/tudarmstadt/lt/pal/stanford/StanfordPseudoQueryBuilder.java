@@ -11,7 +11,6 @@ import de.tudarmstadt.lt.pal.PseudoQuery;
 import de.tudarmstadt.lt.pal.SPARQLTriple;
 import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.semgraph.SemanticGraph;
-import edu.stanford.nlp.semgraph.SemanticGraphEdge;
 
 
 public class StanfordPseudoQueryBuilder {
