@@ -33,7 +33,8 @@ public class SPARQLTriple {
 		
 		public String toString() {
 			if (type == ConstantType.MappedConstantType) {
-				return name;
+				// dbpedia-owl:Agent vs. <http://dbpedia.org/ontology/Agent>
+				return name.contains(":") ? name : "<" + name + ">";
 			} else /*if (type == ConstantType.UnmappedConstantType)*/ {
 				return "\"" + name + "\"";
 			}
