@@ -75,23 +75,28 @@ public class WordNetConnector {
 	}
 	
 	public Set<ComparablePair<String, Float>> getHyponyms(ISynset s) {
-		return getHyponyms(s, 0);
+		return getHyponyms(s, 1);
 	}
 	
+	int maxDepth = 3;
 	public Set<ComparablePair<String, Float>> getHyponyms(ISynset s, int depth) {
-		if (depth > 3) {
+		if (depth == maxDepth) {
 			return Collections.emptySet();
 		}
+		float scoreInThisDepth = 1 - (float)depth / maxDepth;
 		Set<ComparablePair<String, Float>> res = new HashSet<>();
 //		Map foo = word.getRelatedMap();
 		List<ISynsetID> sIDs = s.getRelatedSynsets(Pointer.HYPONYM);
 		for (ISynsetID sID : sIDs) {
 			ISynset hS = dict.getSynset(sID);
 			for (IWord h : hS.getWords()) {
-				res.add(new ComparablePair<String, Float>(h.getLemma(), 0.5f));
+//				if (h.getLemma().equals("bridge")) {
+//					System.out.println("stop");
+//				}
+				res.add(new ComparablePair<String, Float>(h.getLemma(), scoreInThisDepth));
 			}
 			for (ComparablePair<String, Float> transitiveH : getHyponyms(hS, depth + 1)) {
-				res.add(new ComparablePair<String, Float>(transitiveH.key, transitiveH.value / 2.0f));
+				res.add(new ComparablePair<String, Float>(transitiveH.key, transitiveH.value));
 			}
 		}
 		return res;
@@ -99,6 +104,6 @@ public class WordNetConnector {
 	
 	public static void main(String[] args) {
 		WordNetConnector wnc = new WordNetConnector("/usr/local/Cellar/wordnet/3.1/dict/");
-		wnc.getSynonyms("create", "v");
+		wnc.getSynonyms("cross", "v");
 	}
 }
