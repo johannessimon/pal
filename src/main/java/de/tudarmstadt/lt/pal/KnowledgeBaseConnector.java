@@ -2,21 +2,23 @@ package de.tudarmstadt.lt.pal;
 import java.net.URLDecoder;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
-import com.hp.hpl.jena.ontology.OntClass;
 import com.hp.hpl.jena.ontology.OntModel;
 import com.hp.hpl.jena.ontology.OntModelSpec;
 import com.hp.hpl.jena.ontology.OntProperty;
 import com.hp.hpl.jena.ontology.OntResource;
 import com.hp.hpl.jena.query.Dataset;
+import com.hp.hpl.jena.query.DatasetFactory;
 import com.hp.hpl.jena.query.QueryExecution;
 import com.hp.hpl.jena.query.QueryExecutionFactory;
 import com.hp.hpl.jena.query.QuerySolution;
 import com.hp.hpl.jena.query.ReadWrite;
 import com.hp.hpl.jena.query.ResultSet;
-import com.hp.hpl.jena.rdf.model.InfModel;
 import com.hp.hpl.jena.rdf.model.Literal;
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
@@ -25,8 +27,6 @@ import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
-import com.hp.hpl.jena.reasoner.ReasonerRegistry;
-import com.hp.hpl.jena.tdb.TDBFactory;
 import com.hp.hpl.jena.vocabulary.RDF;
 
 import de.tudarmstadt.lt.pal.util.ComparablePair;
@@ -38,20 +38,107 @@ public class KnowledgeBaseConnector {
 	
 	Model model;
 	OntModel ontModel;
-	InfModel infModel;
+//	InfModel infModel;
 	Dataset data;
 	String sparqlEndpoint;
 	
-	public final String SPARQL_PREFIXES =
-			"PREFIX dbo: <http://dbpedia.org/ontology/>\n" +
-			"PREFIX dbp: <http://dbpedia.org/property/>\n" +
-			"PREFIX res: <http://dbpedia.org/resource/>\n" +
-			"PREFIX yago: <http://dbpedia.org/class/yago/>\n" +
-			"PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n" +
-			"PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n" +
-			"PREFIX owl: <http://www.w3.org/2002/07/owl#>\n" +
-			"PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n" +
-			"PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n";
+	/**
+	 * Returns a short representation of the resource's URI using
+	 * known namespace prefixes. Uses <code>?varName</code> instead
+	 * if resource is null
+	 */
+	public String getSPARQLResourceString(Resource r) {
+		String prefix = namespacePrefixes.get(r.getNameSpace());
+		if (prefix != null) {
+			return prefix + ":" + r.getLocalName();
+		}
+	
+		return "<" + r.getURI() + ">";
+	}
+	
+	/**
+	 * Returns a short representation of the resource's URI using
+	 * known namespace prefixes.
+	 */
+	public String getSPARQLResourceString(String uri) {
+		Resource r = getResource(uri);
+		if (r == null) {
+			return uri;
+		}
+		return getSPARQLResourceString(r);
+	}
+	
+	/**
+	 * Maps namespace -> prefix
+	 */
+	Map<String, String> namespacePrefixes;
+	
+	private void fillNamespacePrefixes() {
+		namespacePrefixes = new HashMap<>();
+		namespacePrefixes.put("http://dbpedia.org/ontology/", "dbpedia-owl");
+		namespacePrefixes.put("http://dbpedia.org/property/", "dbpprop");
+		namespacePrefixes.put("http://dbpedia.org/resource/", "dbpedia");
+		namespacePrefixes.put("http://dbpedia.org/class/yago/", "yago");
+		namespacePrefixes.put("http://xmlns.com/foaf/0.1/", "foaf");
+		namespacePrefixes.put("http://www.w3.org/2001/XMLSchema#", "xsd");
+		namespacePrefixes.put("http://www.w3.org/2002/07/owl#", "owl");
+		namespacePrefixes.put("http://www.w3.org/2000/01/rdf-schema#", "rdfs");
+		namespacePrefixes.put("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf");
+		namespacePrefixes.put("http://jena.apache.org/text#", "text");
+	}
+	
+	private String getNamespacePrefixDeclarations() {
+		StringBuilder res = new StringBuilder();
+		for (Entry<String, String> entry : namespacePrefixes.entrySet()) {
+			String prefix = entry.getValue();
+			String ns = entry.getKey();
+			res.append("PREFIX ");
+			res.append(prefix);
+			res.append(": <");
+			res.append(ns);
+			res.append(">\n");
+		}
+		return res.toString();
+	}
+	
+	/**
+	 * Constructor to connect to local Fuseki server
+	 */
+	/*
+	public KnowledgeBaseConnector() {
+		sparqlEndpoint = "http://localhost:8890/sparql/";
+		VirtDataset data = new VirtDataset("jdbc:virtuoso://localhost:1111", "dba", "dba");
+		data.begin(ReadWrite.READ);
+		model = data.getNamedModel("http://dbpedia.org");
+		ontModel = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM, model);
+//		ontModel.prepare();
+//		Iterator<OntClass> it = ontModel.listClasses();
+//		while (it.hasNext()) {
+//			System.out.println(it.next());
+//		}
+		fillNamespacePrefixes();
+	}*/
+	
+	/**
+	 * Constructor to connect to local Virtuoso server
+	 */
+	public KnowledgeBaseConnector() {
+		sparqlEndpoint = "http://localhost:3030/ds/query";
+//		Dataset data = TDBFactory.createDataset("/Users/jsimon/No-Backup/dbpedia37/tdb");
+		data = DatasetFactory.assemble(
+			    "/Users/jsimon/No-Backup/dbpedia37/dbpedia37-fuseki.ttl", 
+			    "http://localhost/dbpedia37#text_dataset") ;
+		data.begin(ReadWrite.READ);
+		model = data.getDefaultModel();
+		ontModel = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM, model);
+		
+//		ontModel.prepare();
+//		Iterator<OntClass> it = ontModel.listClasses();
+//		while (it.hasNext()) {
+//			System.out.println(it.next());
+//		}
+		fillNamespacePrefixes();
+	}/*
 	
 	public KnowledgeBaseConnector(String tdbDir) {
 		// Create a TDB-backed dataset
@@ -62,17 +149,18 @@ public class KnowledgeBaseConnector {
 		model = data.getDefaultModel();
 		sparqlEndpoint = null;
 		ontModel = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM, model);
-		infModel = ModelFactory.createInfModel(ReasonerRegistry.getOWLMicroReasoner(), model); 
+//		infModel = ModelFactory.createInfModel(ReasonerRegistry.getOWLMicroReasoner(), model);
+		fillNamespacePrefixes();
 	}
 	
 	public KnowledgeBaseConnector(String tdbDir, String sparqlEndpoint) {
 		this(tdbDir);
 		this.sparqlEndpoint = sparqlEndpoint;
-	}
+	}*/
 	
 	private QueryExecution getQueryExec(String query) {
 		numQueries++;
-		query = SPARQL_PREFIXES + "\n" + query;
+		query = getNamespacePrefixDeclarations() + "\n" + query;
 //		System.out.println(query);
 		QueryExecution qexec;
 		if (sparqlEndpoint != null) {
@@ -84,75 +172,17 @@ public class KnowledgeBaseConnector {
 	}
 	
 	/**
-	 * Returns the number of values the specified property of the specified
-	 * resource <code>subject</code> has, i.e. the number of
-	 * <code>(subject, prop, *)</code>
-	 * triples.<br/>
-	 * <b>Note:</b> This number may include resources as well as literals.
-	 */
-	/*
-	int getSubjectPropertyScore(Resource subject, Property prop, String objectType) {
-//		return subject.listProperties(prop).toList().size();
-		int numResults = 0;
-		String queryString = "SELECT (COUNT(*) AS ?count) WHERE { <" + subject + "> <" + prop + "> ?object . ";
-		if (objectType != null) {
-			queryString += "?object rdf:type <" + objectType + "> . ";
-		}
-		queryString += "}";
-		
-		QueryExecution qexec = getQueryExec(queryString);
-		try {
-			ResultSet res = qexec.execSelect();
-
-			for (; res.hasNext(); ) {
-				QuerySolution sol = res.next();
-				numResults = sol.getLiteral("count").getInt();
-			}
-		} catch (Exception e) {
-			System.out.println("Query FAILED: " + queryString);
-		} finally {
-			qexec.close();
-		}
-		return numResults;
-	}*/
-
-	/**
-	 * Returns the number of resources that are subject of a
-	 * <code>(*, prop, object)</code>
-	 * triple.<br/>
-	 */
-	/*
-	int getPropertyObjectScore(Property prop, Resource object, String subjectType) {
-//		return model.listResourcesWithProperty(prop, object).toList().size();
-		int numResults = 0;
-		String queryString = "SELECT (COUNT(*) AS ?count) WHERE { ?subject <" + prop + "> <" + object + "> . ";
-		if (subjectType != null) {
-			queryString += "?subject rdf:type <" + subjectType + "> . ";
-		}
-		queryString += "}";
-		
-		QueryExecution qexec = getQueryExec(queryString);
-		try {
-			ResultSet res = qexec.execSelect();
-
-			for (; res.hasNext(); ) {
-				QuerySolution sol = res.next();
-				numResults = sol.getLiteral("count").getInt();
-			}
-		} catch (Exception e) {
-			System.out.println("Query FAILED: " + queryString);
-		} finally {
-			qexec.close();
-		}
-		return numResults;
-	}
-	*/
-	
-	/**
 	 * Returns the property with the specified URI
 	 */
 	Property getProperty(String uri) {
 		return model.getProperty(uri);
+	}
+	
+	/**
+	 * Returns the ontology property with the specified URI
+	 */
+	OntProperty getOntProperty(String uri) {
+		return ontModel.getOntProperty(uri);
 	}
 
 	/**
@@ -208,34 +238,8 @@ public class KnowledgeBaseConnector {
 				}
 			}
 		}
-		/*
-		String queryString = "SELECT ?type WHERE { ?type rdf:type dbo:Class . "
-				                  + "?type rdf:label '" + name + "' . }";
-		QueryExecution qexec = getQueryExec(queryString);
-		try {
-			ResultSet resultSet = qexec.execSelect();
-			while (resultSet.hasNext()) {
-				QuerySolution s = resultSet.next();
-				Resource type = s.getResource("type");
-				types.add(type);
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}*/
 		return types;
 	}
-	
-	/*private String getBifContainsConstraints(String name) {
-		String[] tokens = name.split(" ");
-		StringBuilder res = new StringBuilder();
-		// TODO: So funktioniert das nicht...
-		for (String token : tokens ) {
-			res.append("?name <bif:contains> \"");
-			res.append(token);
-			res.append("\" . ");
-		}
-		return res.toString();
-	}*/
 	
 	List<ComparablePair<Resource, Float>> getResourceCandidates(String name, int limit) {
 		System.out.println("Searching resources... [" + name + "]");
@@ -245,13 +249,15 @@ public class KnowledgeBaseConnector {
 		}
 		List<ComparablePair<Resource, Float>> result = new LinkedList<ComparablePair<Resource, Float>>();
 		{
-//			String bifContainsConstraints = getBifContainsConstraints(name);
-			String queryString = "SELECT DISTINCT ?subject ?name FROM <http://dbpedia.org> WHERE { \n"
-				               + "  { ?subject foaf:name ?name . ?name <bif:contains> \"'" + name + "'\"} UNION\n"
-				               + "  { ?subject rdfs:label ?name . ?name <bif:contains> \"'" + name + "'\"} . \n"
-				               + "  ?subject a owl:Thing . \n"
-					           + "  FILTER(langMatches(lang(?name), \"en\"))\n"
-//				               + "         contains(?name, \"" + name + "\")) \n"
+			String queryString = "SELECT DISTINCT ?subject ?name WHERE { \n"
+//				               + "  { ?subject foaf:name ?name . ?name <bif:contains> \"'" + name + "'\"} UNION\n"
+//				               + "  { ?subject rdfs:label ?name . ?name <bif:contains> \"'" + name + "'\"} . \n"
+							   // Important: text:query must come first for pre-filtering (otherwise it takes much longer)
+						       + "  ?subject text:query('" + name + "' " + limit + ") . \n"
+		                       + "  ?subject a owl:Thing . \n"
+							   + "  { ?subject foaf:name ?name . FILTER(langMatches(lang(?name), \"en\") && contains(?name, \"" + name + "\")) }\n"
+                               + "  UNION\n"
+                               + "  { ?subject rdfs:label ?name . FILTER(langMatches(lang(?name), \"en\") && contains(?name, \"" + name + "\")) }\n"
 //				               + "         strstarts(str(?subject), \"http://dbpedia.org\"))\n"
 				               + "} \n"
 					           + "LIMIT " + limit;
@@ -292,7 +298,7 @@ public class KnowledgeBaseConnector {
 		Collection<String> res = new LinkedList<String>();
 		
 		// Invalid query check
-		if (queryString.contains("<null>")) {
+		if (queryString == null || queryString.contains("<null>")) {
 			return res;
 		}
 		
@@ -318,21 +324,13 @@ public class KnowledgeBaseConnector {
 		return res;
 	}
 	
-	private String getSPARQLString(Resource r, String varName) {
-		if (r == null) {
-			return varName;
-		} else {
-			return "<" + r.getURI() + ">";
-		}
-	}
-	
 	/**
 	 * Returns either an <code>OntClass</code> or a <code>DataRange</code> representation of the
 	 * given resource or null if no such representation exists.
 	 */
-	private OntResource getOntResource(Resource r) {
+	OntResource getOntResource(Resource r) {
 		if (r != null) {
-			OntResource ontR = ontModel.getOntResource(r.getURI());
+			OntResource ontR = ontModel.getOntResource(r);
 			if (ontR.isClass() || ontR.isDataRange()) {
 				return ontR;
 			}
@@ -346,23 +344,29 @@ public class KnowledgeBaseConnector {
 	 * @return True if either <code>type</code> or <code>toCheck</code> is null or
 	 * if <code>toCheck</code> is (either directly or transitively) equal to <code>type</code>
 	 */
-	boolean checkTypeConstraint(OntResource type, OntResource toCheck) {
-		if (type == null || toCheck == null) {
+	/*
+	boolean checkTypeConstraint(OntResource superType, OntResource subType) {
+		// There is no type constraint
+		if (superType == null) {
 			return true;
 		}
+		// This means range/domain to check for is unknown
+		if (subType == null) {
+			return false;
+		}
 		// Class constraint (e.g. dbpedia-owl:Agent)
-		if (type.isClass()) {
-			OntClass ontClass = type.asClass();
-			return ontClass.hasSubClass(toCheck) || ontClass.equals(toCheck);
+		if (superType.isClass()) {
+			OntClass ontClass = superType.asClass();
+			return ontClass.hasSubClass(subType) || ontClass.equals(subType);
 		// Data range constraint (e.g. xsd:integer)
-		} else if (type.isDataRange()) {
-			return type.equals(toCheck);
+		} else if (superType.isDataRange()) {
+			return superType.equals(subType);
 		} else {
 			return true;
 		}
-	}
+	}*/
 	
-	Collection<ComparablePair<Property, Float>> getPropertyCandidates(Collection<ComparablePair<String, Float>> nameCandidates, Resource subject, Resource object) {
+	Collection<ComparablePair<Property, Float>> getPropertyCandidates(Map<String, Float> nameCandidates, Resource subject, Resource object) {
 		OntResource subjectType = getOntResource(subject);
 		OntResource objectType = getOntResource(object);
 		// Set subject/object is to null iff. it is a variable
@@ -375,8 +379,8 @@ public class KnowledgeBaseConnector {
 		boolean subjectIsVar = subject == null;
 		boolean objectIsVar = object == null;
 		
-		String querySubject = getSPARQLString(subject, "?s");
-		String queryObject = getSPARQLString(object, "?o");
+		String querySubject = subject == null ? "?s" : getSPARQLResourceString(subject);
+		String queryObject = object == null ? "?o" : getSPARQLResourceString(object);
 		String query = "SELECT ?p ";
 		// Count number of property "connections" only if we have exactly one
 		// variable (^ is XOR) and no clue about the property
@@ -385,7 +389,15 @@ public class KnowledgeBaseConnector {
 			String countVar = subjectIsVar ? "?s" : "?o";
 			query += "(COUNT(" + countVar + ") AS ?count)";
 		}
-		query += " FROM <http://dbpedia.org> WHERE { " + querySubject + " ?p " + queryObject + " } GROUP BY ?p";
+		query += " WHERE { " + querySubject + " ?p " + queryObject + " . ";
+//		query += " FROM <http://dbpedia.org> WHERE { " + querySubject + " ?p " + queryObject + " . ";
+		if (subjectType != null) {
+			query += "?s a " + getSPARQLResourceString(subjectType) + " . ";
+		}
+		if (objectType != null) {
+			query += "?o a " + getSPARQLResourceString(objectType) + " . ";
+		}
+		query += "} GROUP BY ?p";
 		QueryExecution qexec = getQueryExec(query);
 				
 		List<ComparablePair<Property, Float>> result = new LinkedList<ComparablePair<Property, Float>>();
@@ -393,6 +405,10 @@ public class KnowledgeBaseConnector {
 		while (propPreCandidates.hasNext()) {
 			QuerySolution sol = propPreCandidates.next();
 			Resource pRes = sol.getResource("p");
+			// Probably the result set is empty (but has one null entry with count 0)
+			if (pRes == null) {
+				break;
+			}
 			float countScore = 1.0f;
 			if (useCountScore) {
 				countScore = sol.getLiteral("count").getInt();
@@ -403,13 +419,13 @@ public class KnowledgeBaseConnector {
 			}
 			String pName = p.getLocalName().toLowerCase();
 			if (nameCandidates != null) {
-				for (ComparablePair<String, Float> candidate : nameCandidates) {
-					if (pName.startsWith(candidate.key)) {
-						if (checkTypeConstraint(p.getDomain(), subjectType) &&
-							checkTypeConstraint(p.getRange(), objectType)) {
-							float score = (float)candidate.key.length() / pName.length() * candidate.value * countScore;
+				for (Entry<String, Float> candidate : nameCandidates.entrySet()) {
+					if (pName.startsWith(candidate.getKey())) {
+//						if (checkTypeConstraint(subjectType, p.getDomain()) &&
+//							checkTypeConstraint(objectType, p.getRange())) {
+							float score = (float)candidate.getKey().length() / pName.length() * candidate.getValue() * countScore;
 							result.add(new ComparablePair<Property, Float>(p, score));
-						}
+//						}
 					}
 				}
 			} else {
@@ -424,6 +440,8 @@ public class KnowledgeBaseConnector {
 	
 	public void close() {
 		System.out.println("Closing KB Connector. Number of queries: " + numQueries);
+		ontModel.close();
+		model.close();
 		data.end();
 	}
 }

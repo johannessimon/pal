@@ -20,15 +20,25 @@ public class PseudoQuery {
 			sb.append("\n");
 		}
 		for (SPARQLTriple.Variable var : vars.values()) {
-			if (var.type != null) {
+			if (var.typeName != null) {
 				sb.append("   [?");
 				sb.append(var.name);
 				sb.append(" TYPE ");
-				sb.append(var.type);
+				sb.append(var.typeName);
 				sb.append("]\n");
 			}
 		}
 		sb.append("}");
 		return sb.toString();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		PseudoQuery otherPQ = (PseudoQuery)other;
+		if (otherPQ == null) {
+			return false;
+		}
+		return triples.size() == otherPQ.triples.size() &&
+			   triples.containsAll(otherPQ.triples);
 	}
 }

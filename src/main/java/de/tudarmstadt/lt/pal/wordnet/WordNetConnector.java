@@ -3,18 +3,15 @@ package de.tudarmstadt.lt.pal.wordnet;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Map.Entry;
 
-import de.tudarmstadt.lt.pal.util.ComparablePair;
 import edu.mit.jwi.Dictionary;
 import edu.mit.jwi.IDictionary;
 import edu.mit.jwi.item.IIndexWord;
-import edu.mit.jwi.item.IPointer;
 import edu.mit.jwi.item.ISynset;
 import edu.mit.jwi.item.ISynsetID;
 import edu.mit.jwi.item.IWord;
@@ -36,8 +33,23 @@ public class WordNetConnector {
 		}
 	}
 	
-	public Collection<ComparablePair<String, Float>> getSynonyms(String word, String posStr) {
-		Set<ComparablePair<String, Float>> synonyms = new HashSet<ComparablePair<String, Float>>();
+	public void addSynonyms(Map<String, Float> synonyms, Map<String, Float> toAdd) {
+		for (Entry<String, Float> s : toAdd.entrySet()) {
+			addSynonym(synonyms, s.getKey(), s.getValue());
+		}
+	}
+	
+	public void addSynonym(Map<String, Float> synonymScores, String synonym, float score) {
+		Float existingScore = synonymScores.get(synonym);
+		// Insert only if no such synonym exists yet or if
+		// we've found a better score for the same synonym
+		if (existingScore == null || score > existingScore) {
+			synonymScores.put(synonym, score);
+		}
+	}
+	
+	public Map<String, Float> getSynonyms(String word, String posStr) {
+		Map<String, Float> synonymScores = new HashMap<>();
 		POS pos;
 		if (posStr.startsWith("n")) {
 			pos = POS.NOUN;
@@ -51,40 +63,59 @@ public class WordNetConnector {
 			return null;
 		}
 		IIndexWord idxWord = dict.getIndexWord(word, pos);
+		if (idxWord == null) {
+			return null;
+		}
 		for (IWordID wordID : idxWord.getWordIDs()) {
 			IWord w = dict.getWord(wordID);
-			synonyms.addAll(getHyponyms(w.getSynset()));
-			synonyms.add(new ComparablePair<String, Float>(w.getLemma(), 1.0f));
-//			System.out.println("== " + w.getLexicalID());
+			addSynonyms(synonymScores, getHyponyms(w.getSynset()));
+			addSynonym(synonymScores, w.getLemma(), 1.0f);
+			// Get direct and transitive synonyms
+			addSynonyms(synonymScores, getSynonyms(w, 1, 2, w.getLemma()));
 			
-			Map<IPointer, List<IWordID>> rMap = w.getRelatedMap();
-			for (IPointer p : rMap.keySet()) {
-//				System.out.println(p.getName());
-//				System.out.println(p.getSymbol());
-				List<IWordID> rWordIDs = rMap.get(p);
-				for (IWordID rWordID : rWordIDs) {
-					IWord rW = dict.getWord(rWordID);
-					synonyms.add(new ComparablePair<String, Float>(rW.getLemma(), 1.0f));
-					synonyms.addAll(getHyponyms(rW.getSynset()));
-				}
+			List<IWordID> rWordIDs = w.getRelatedWords(Pointer.DERIVATIONALLY_RELATED);
+			for (IWordID rWordID : rWordIDs) {
+				IWord rW = dict.getWord(rWordID);
+				addSynonym(synonymScores, rW.getLemma(), 1.0f);
+				addSynonyms(synonymScores, getHyponyms(rW.getSynset()));
+				
+				// Get direct and transitive synonyms
+				addSynonyms(synonymScores, getSynonyms(rW, 1, 2, w.getLemma() + "->" + rW.getLemma()));
 			}
 		}
 		
 //		System.out.println(synonyms);
-		return synonyms;
+		return synonymScores;
 	}
 	
-	public Set<ComparablePair<String, Float>> getHyponyms(ISynset s) {
+	public Map<String, Float> getSynonyms(IWord word, int depth, int maxDepth, String source) {
+		Map<String, Float> res = new HashMap<>();
+		if (depth > maxDepth) {
+			return res;
+		}
+		List<IWordID> words = dict.getIndexWord(word.getLemma(), word.getPOS()).getWordIDs();
+		for (IWordID sameWordInOtherSynset : words) {
+			ISynset s = dict.getWord(sameWordInOtherSynset).getSynset();
+			for (IWord synonym : s.getWords()) {
+				float score = 1.0f - (float)depth / (maxDepth + 1);
+				addSynonym(res, /*source + "/" + */synonym.getLemma(), score);
+				addSynonyms(res, getSynonyms(synonym, depth + 1, maxDepth, source + "/" + synonym.getLemma()));
+			}
+		}
+		return res;
+	}
+	
+	public Map<String, Float> getHyponyms(ISynset s) {
 		return getHyponyms(s, 1);
 	}
 	
 	int maxDepth = 3;
-	public Set<ComparablePair<String, Float>> getHyponyms(ISynset s, int depth) {
+	public Map<String, Float> getHyponyms(ISynset s, int depth) {
 		if (depth == maxDepth) {
-			return Collections.emptySet();
+			return Collections.emptyMap();
 		}
 		float scoreInThisDepth = 1 - (float)depth / maxDepth;
-		Set<ComparablePair<String, Float>> res = new HashSet<>();
+		Map<String, Float> res = new HashMap<>();
 //		Map foo = word.getRelatedMap();
 		List<ISynsetID> sIDs = s.getRelatedSynsets(Pointer.HYPONYM);
 		for (ISynsetID sID : sIDs) {
@@ -93,17 +124,15 @@ public class WordNetConnector {
 //				if (h.getLemma().equals("bridge")) {
 //					System.out.println("stop");
 //				}
-				res.add(new ComparablePair<String, Float>(h.getLemma(), scoreInThisDepth));
+				addSynonym(res, h.getLemma(), scoreInThisDepth);
 			}
-			for (ComparablePair<String, Float> transitiveH : getHyponyms(hS, depth + 1)) {
-				res.add(new ComparablePair<String, Float>(transitiveH.key, transitiveH.value));
-			}
+			addSynonyms(res, getHyponyms(hS, depth + 1));
 		}
 		return res;
 	}
 	
 	public static void main(String[] args) {
 		WordNetConnector wnc = new WordNetConnector("/usr/local/Cellar/wordnet/3.1/dict/");
-		wnc.getSynonyms("cross", "v");
+		wnc.getSynonyms("start", "v");
 	}
 }

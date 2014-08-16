@@ -63,13 +63,14 @@ public class StanfordTripleExtractor {
 				if (node.tag().startsWith("N")) {
 					resultT.object = node;
 				}
-				resultT.predicate = node.value(); // no variable! (thus use String object)
+				resultT.predicate = node.lemma() + StanfordPseudoQueryBuilder.getWordTagSuffix(node); // no variable! (thus use String object)
 				resultT.subject = child;
 			} else if (relName.equals("prep")) {
 				// If the object modifies a verb, then the
 				// verb is part of the relation (predicate)
 				if (node.tag().startsWith("V")) {
-					resultT.predicate = node.value() + " " + rel.getSpecific();
+					// TODO: "born in" -> take "bear" as predicate and interprate "in" as dbpedia-owl:Place for target
+					resultT.predicate = node.lemma() + StanfordPseudoQueryBuilder.getWordTagSuffix(node);// + " " + rel.getSpecific();
 				} else {
 					// In this case we don't know anything about the predicate and will use
 					// a wildcard (thus constraint = "there must be a relation between subject/object")

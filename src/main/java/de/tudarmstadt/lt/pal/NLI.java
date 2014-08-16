@@ -3,10 +3,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 
 import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
 import de.tudarmstadt.lt.pal.stanford.StanfordPseudoQueryBuilder;
@@ -16,10 +14,10 @@ import edu.stanford.nlp.semgraph.SemanticGraph;
  * Simple front-end for PAL using the console.
  */
 public class NLI {
-	KnowledgeBaseConnector kb = new KnowledgeBaseConnector("/Users/jsimon/No-Backup/dbpedia/data", "http://dbpedia.org/sparql");
+	KnowledgeBaseConnector kb = new KnowledgeBaseConnector(/*"/Users/jsimon/No-Backup/dbpedia/data", "http://dbpedia.org/sparql"*/);
 	TripleMapper tripleMapper = new TripleMapper(kb);
 	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
-	StanfordDependencyParser depParser = new StanfordDependencyParser();
+	StanfordDependencyParser depParser = new StanfordDependencyParser("/Users/jsimon/No-Backup/stanford-parser-tmp");
 
 	public static void main(String[] args) {
 		new NLI().runInteractive();
@@ -48,15 +46,16 @@ public class NLI {
 		List<String> answers = new LinkedList<String>();
 		SemanticGraph dependencies = depParser.parse(text);
 		PseudoQuery pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
+		System.out.println("PSEUDO QUERY: " + pseudoQuery);
 
-		Set<String> variableSet = new HashSet<String>();
 		String query = tripleMapper.buildSPARQLQuery(pseudoQuery);
 		System.out.println("QUERY: " + query);
 		System.out.println("======= ANSWER =======");
 		try {
-			for (String var : variableSet) {
+			for (String var : pseudoQuery.vars.keySet()) {
 				System.out.println("?" + var + ":");
-				answers.addAll(kb.query(query, var));
+				Collection<String> _answers = kb.query(query, var);
+				answers.addAll(_answers);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();

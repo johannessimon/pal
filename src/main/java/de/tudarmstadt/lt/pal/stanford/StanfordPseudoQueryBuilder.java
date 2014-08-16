@@ -11,10 +11,11 @@ import de.tudarmstadt.lt.pal.PseudoQuery;
 import de.tudarmstadt.lt.pal.SPARQLTriple;
 import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.semgraph.SemanticGraph;
+import edu.stanford.nlp.semgraph.SemanticGraphEdge;
 
 
 public class StanfordPseudoQueryBuilder {
-	KnowledgeBaseConnector kb = new KnowledgeBaseConnector("/Users/jsimon/No-Backup/dbpedia/data", "http://dbpedia.org/sparql");
+	KnowledgeBaseConnector kb = new KnowledgeBaseConnector(/*"/Users/jsimon/No-Backup/dbpedia/data", "http://dbpedia.org/sparql"*/);
 	
 	public StanfordPseudoQueryBuilder(KnowledgeBaseConnector kb) {
 		this.kb = kb;
@@ -41,17 +42,17 @@ public class StanfordPseudoQueryBuilder {
 			String type = var.lemma();
 			switch (type.toLowerCase()) {
 			case "who":
-				type = "<http://dbpedia.org/ontology/Agent>";
+				type = "http://dbpedia.org/ontology/Person";
 				break;
 			case "where":
-				type = "<http://dbpedia.org/ontology/Place>";
+				type = "http://dbpedia.org/ontology/Place";
 				break;
 			case "when":
 				type = "xsd:date";
 				break;
 			}
 			// System.out.println(variables.get(var) + " <type> " + type);
-			sparqlVar.type = type;
+			sparqlVar.typeName = type;
 			vars.put(sparqlVar.name, sparqlVar);
 		}
 		
@@ -67,23 +68,45 @@ public class StanfordPseudoQueryBuilder {
 		return new String(new char[] { firstVar });
 	}
 	
-	static SPARQLTriple.Variable registerVariable(Map<IndexedWord, SPARQLTriple.Variable> variables, IndexedWord word, String varType) {
+	static SPARQLTriple.Variable registerVariable(Map<IndexedWord, SPARQLTriple.Variable> variables, IndexedWord word, SemanticGraph deps, String varType) {
 		SPARQLTriple.Variable var = variables.get(word);
 		if (var == null) {
-			String varName = word.lemma();//getVariableName(variables.size());
+			String varName = getNodeText(deps, word).replace(' ', '_');
+			if (varType == null) {
+				varType = varName;
+			}
 			var = new SPARQLTriple.Variable(varName, varType);
 			variables.put(word, var);
 		}
 		return var;
 	}
 	
+	public static String getWordTagSuffix(IndexedWord word) {
+		if (word.tag() != null && !word.tag().isEmpty()) {
+			String tag = word.tag().toLowerCase();
+			if (tag.length() > 1) {
+				tag = tag.substring(0, 1);
+			}
+			return "#" + tag;
+		}
+		return "";
+	}
+	
 	private static String getNodeText(SemanticGraph deps, IndexedWord word) {
 		String resStr = "";
 		for (IndexedWord child : deps.getChildren(word)) {
-//			List<SemanticGraphEdge> edges = deps.getAllEdges(word, child);
-			resStr += getNodeText(deps, child);
+			List<SemanticGraphEdge> edges = deps.getAllEdges(word, child);
+			for (SemanticGraphEdge e : edges) {
+				String relName = e.getRelation().getShortName();
+				if (relName.equals("nn") ||
+					relName.endsWith("mod") ||
+					relName.equals("dep")) {
+					resStr += getNodeText(deps, child) + " ";
+					break;
+				}
+			}
 		}
-		resStr += word.value();
+		resStr += word.lemma();//word.value();
 		return resStr;
 	}
 	
@@ -96,8 +119,14 @@ public class StanfordPseudoQueryBuilder {
 			IndexedWord word = (IndexedWord)node;
 			
 			if (word.tag().startsWith("N")) {
-				resStr = getNodeText(deps, word);
-				res = new SPARQLTriple.Constant(resStr, SPARQLTriple.ConstantType.UnmappedConstantType);
+				resStr = getNodeText(deps, word) + getWordTagSuffix(word);
+				// Un-proper noun (singular and plural)
+				if (word.tag().equals("NN") || word.tag().equals("NNS")) {
+					res = registerVariable(variables, word, deps, null);
+				// Proper noun
+				} else {
+					res = new SPARQLTriple.Constant(resStr, SPARQLTriple.ConstantType.UnmappedConstantType);
+				}
 			} /*if (word.tag().startsWith("NNP")) {
 				for (IndexedWord child : deps.getChildren(word)) {
 					List<SemanticGraphEdge> edges = deps.getAllEdges(word, child);
@@ -110,20 +139,15 @@ public class StanfordPseudoQueryBuilder {
 				}
 				resStr += word.value();
 				res = new SPARQLTriple.Constant(resStr, SPARQLTriple.ConstantType.UnmappedConstantType);
-			} */else if (word.tag().startsWith("NN")) {
-				res = registerVariable(variables, word, word.lemma());
-			} else if (word.tag().startsWith("W")) {
+			} */else if (word.tag().startsWith("W")) {
 				if (word.value().toLowerCase().equals("who")) {
-					res = registerVariable(variables, word, "<http://dbpedia.org/ontology/Agent>");
+					res = registerVariable(variables, word, deps, "http://dbpedia.org/ontology/Person");
 				} else if (word.value().toLowerCase().equals("where")) {
-					res = registerVariable(variables, word, "<http://dbpedia.org/ontology/Place>");
+					res = registerVariable(variables, word, deps, "http://dbpedia.org/ontology/Place");
 				}
 			} else {
-				res = new SPARQLTriple.Constant(word.value(), SPARQLTriple.ConstantType.UnmappedConstantType);
-				if (word.tag() != null && !word.tag().isEmpty()) {
-					String posSuffix = "#" + word.tag().toLowerCase();
-					res.name += posSuffix;
-				}
+				res = new SPARQLTriple.Constant(word.lemma(), SPARQLTriple.ConstantType.UnmappedConstantType);
+				res.name += getWordTagSuffix(word);
 			}
 		}
 		

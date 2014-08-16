@@ -22,15 +22,23 @@ import org.junit.runners.Parameterized;
 import org.xml.sax.SAXException;
 
 import de.tudarmstadt.lt.pal.KnowledgeBaseConnector;
+import de.tudarmstadt.lt.pal.PseudoQuery;
 import de.tudarmstadt.lt.pal.TripleMapper;
+import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
+import de.tudarmstadt.lt.pal.stanford.StanfordPseudoQueryBuilder;
+import edu.stanford.nlp.pipeline.StanfordCoreNLP;
+import edu.stanford.nlp.semgraph.SemanticGraph;
 
 @RunWith(Parameterized.class)
-public class QALD2MapTest {
+public class QALD2Test {
 	QALD2Entry entry;
 	KnowledgeBaseConnector kb = new KnowledgeBaseConnector(/*"/Users/jsimon/No-Backup/dbpedia/data", null*/);
 	TripleMapper tripleMapper = new TripleMapper(kb);
+	StanfordCoreNLP pipeline;
+	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
+	StanfordDependencyParser depParser = new StanfordDependencyParser("/Users/jsimon/No-Backup/stanford-parser-tmp");
 	
-	public QALD2MapTest(String question, QALD2Entry entry) {
+	public QALD2Test(String question, QALD2Entry entry) {
 		this.entry = entry;
 	}
 	
@@ -39,12 +47,10 @@ public class QALD2MapTest {
 		List<Object> params = new LinkedList<Object>();
 		Collection<QALD2Entry> entries = QALD2XMLParser.parse(
 				"/Users/jsimon/Documents/Uni/Watson-Projekt/dbpedia-train-answers.xml",
-				"/Users/jsimon/Documents/Uni/Watson-Projekt/dbpedia-train-answers-pseudoqueries.xml");
+				null);
 
 		for (QALD2Entry entry : entries) {
-			if (entry.pseudoQuery != null) {
-				params.add(new Object[] { entry.question, entry });
-			}
+			params.add(new Object[] { entry.question, entry });
 		}
 		
 		return params;
@@ -53,12 +59,15 @@ public class QALD2MapTest {
 	@Test
 	public void test() throws ParseException {
 		Set<String> answers = new HashSet<String>();
+		StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
+		SemanticGraph dependencies = depParser.parse(entry.question);
+		PseudoQuery pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
 
-		String query = tripleMapper.buildSPARQLQuery(entry.pseudoQuery);
+		String query = tripleMapper.buildSPARQLQuery(pseudoQuery);
 		assertTrue(query != null);
 		System.out.println("QUERY: " + query);
 		System.out.println("======= ANSWER =======");
-		String focusVar = entry.pseudoQuery.vars.keySet().iterator().next();
+		String focusVar = pseudoQuery.vars.keySet().iterator().next();
 		try {
 			System.out.println("?" + focusVar + ":");
 			answers.addAll(kb.query(query, focusVar));

@@ -35,7 +35,7 @@ public class QALD2XMLParser {
 		DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
 		DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
 		Document doc = dBuilder.parse(xmlFile);
-		Document doc2 = dBuilder.parse(xmlPseudoQueryFile);
+		Document doc2 = xmlPseudoQueryFile != null ? dBuilder.parse(xmlPseudoQueryFile) : null;
 		
 		LinkedList<QALD2Entry> entries = new LinkedList<QALD2Entry>();
 		
@@ -114,7 +114,7 @@ public class QALD2XMLParser {
 					e.printStackTrace();
 				}
 				
-				Node pseudoQueryNode = doc2.getElementById(Integer.toString(qald2Entry.id));
+				Node pseudoQueryNode = doc2 != null ? doc2.getElementById(Integer.toString(qald2Entry.id)) : null;
 				if (pseudoQueryNode != null && pseudoQueryNode.getNodeType() == Node.ELEMENT_NODE) {
 					qald2Entry.pseudoQuery = new PseudoQuery();
 					qald2Entry.pseudoQuery.triples = new HashSet<SPARQLTriple>();

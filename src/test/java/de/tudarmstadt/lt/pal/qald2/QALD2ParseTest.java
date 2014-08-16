@@ -7,7 +7,6 @@ import java.text.ParseException;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Properties;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -20,19 +19,16 @@ import de.tudarmstadt.lt.pal.KnowledgeBaseConnector;
 import de.tudarmstadt.lt.pal.PseudoQuery;
 import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
 import de.tudarmstadt.lt.pal.stanford.StanfordPseudoQueryBuilder;
-import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 
 @RunWith(Parameterized.class)
 public class QALD2ParseTest {
-	StanfordCoreNLP pipeline;
 	QALD2Entry entry;
-	KnowledgeBaseConnector kb = new KnowledgeBaseConnector("/Users/jsimon/No-Backup/dbpedia/data", "http://dbpedia.org/sparql");
+	KnowledgeBaseConnector kb = new KnowledgeBaseConnector(/*"/Users/jsimon/No-Backup/dbpedia/data", "http://dbpedia.org/sparql"*/);
 	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
-	StanfordDependencyParser depParser = new StanfordDependencyParser();
+	StanfordDependencyParser depParser = new StanfordDependencyParser("/Users/jsimon/No-Backup/stanford-parser-tmp");
 	
-	public QALD2ParseTest(String question, StanfordCoreNLP pipeline, QALD2Entry entry) {
-		this.pipeline = pipeline;
+	public QALD2ParseTest(String question, QALD2Entry entry) {
 		this.entry = entry;
 	}
 	
@@ -42,14 +38,10 @@ public class QALD2ParseTest {
 		Collection<QALD2Entry> entries = QALD2XMLParser.parse(
 				"/Users/jsimon/Documents/Uni/Watson-Projekt/dbpedia-train-answers.xml",
 				"/Users/jsimon/Documents/Uni/Watson-Projekt/dbpedia-train-answers-pseudoqueries.xml");
-		
-		Properties props = new Properties();
-		props.put("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
-		StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
 
 		for (QALD2Entry entry : entries) {
 			if (entry.pseudoQuery != null) {
-				params.add(new Object[] { entry.question, pipeline, entry });
+				params.add(new Object[] { entry.question, entry });
 			}
 		}
 		
