@@ -55,17 +55,15 @@ public class TripleMapper {
 			} else {
 				String nameLC = p.name.toLowerCase();
 				Map<String, Float> synonyms = null;
-				if (!nameLC.equals("[]")) {
-					synonyms = new HashMap<>();
-					String pos = null;
-					if (nameLC.contains("#")) {
-						int sepIndex = nameLC.indexOf('#');
-						pos = nameLC.substring(sepIndex + 1);
-						nameLC = nameLC.substring(0, sepIndex);
-						wnc.addSynonyms(synonyms, wnc.getSynonyms(nameLC, pos));
-					}
-					wnc.addSynonym(synonyms, nameLC, 1.0f);
+				synonyms = new HashMap<>();
+				String pos = null;
+				if (nameLC.contains("#")) {
+					int sepIndex = nameLC.indexOf('#');
+					pos = nameLC.substring(sepIndex + 1);
+					nameLC = nameLC.substring(0, sepIndex);
+					wnc.addSynonyms(synonyms, wnc.getSynonyms(nameLC, pos));
 				}
+				wnc.addSynonym(synonyms, nameLC, 1.0f);
 				candidates = kb.getPropertyCandidates(synonyms, subject, object);
 			}
 		}

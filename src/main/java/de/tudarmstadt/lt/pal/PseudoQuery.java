@@ -3,6 +3,10 @@ package de.tudarmstadt.lt.pal;
 import java.util.Collection;
 import java.util.Map;
 
+/**
+ * A pseudo query is a collection of (unmapped) <code>SPARQLTriple</code>'s.<br/>
+ * For convenience, it also contains a map of all variables used in the triples.
+ */
 public class PseudoQuery {
 	public Collection<SPARQLTriple> triples;
 	/**

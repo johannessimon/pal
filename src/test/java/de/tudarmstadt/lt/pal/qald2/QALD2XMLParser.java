@@ -138,9 +138,11 @@ public class QALD2XMLParser {
 						if (elements.length == 3) {
 							for (int k = 0; k < 3; k++) {
 								String e = elements[k];
-								if (e.startsWith("?")) {
+								if (e.startsWith("?")) { // Variable 
 									String varName = e.substring(1); // remove "?"
 									sparqlElements[k] = variables.get(varName);
+								} else if (e.equals("[]")) { // Wildcard
+									sparqlElements[k] = null;
 								} else {
 									sparqlElements[k] = new SPARQLTriple.Constant(e, SPARQLTriple.ConstantType.UnmappedConstantType);
 								}

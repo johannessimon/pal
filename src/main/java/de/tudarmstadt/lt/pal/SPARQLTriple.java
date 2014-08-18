@@ -1,4 +1,5 @@
 package de.tudarmstadt.lt.pal;
+
 /**
  * Represents a triple that can be used in a SPARQL query. May contain
  * yet unmapped properties/resources.

@@ -16,22 +16,34 @@ import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.CollapsedCCProcessedDependenciesAnnotation;
 import edu.stanford.nlp.util.CoreMap;
 
+/**
+ * Interface to stanford dependency parser, uses file-based parse caching
+ */
 public class StanfordDependencyParser {
 	Properties props;
 	StanfordCoreNLP pipeline = null;
 	File tmpDir;
 	
+	/**
+	 * @param tmpDir Temporary directory for parse tree cache
+	 */
 	public StanfordDependencyParser(String tmpDir) {
 		this.tmpDir = new File(tmpDir);
 		props = new Properties();
 		props.put("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
 	}
 	
+	/**
+	 * Get the file in the cache directory representing a given sentence
+	 */
 	private File getCacheFile(String sentence) {
 		int hash = Math.abs(sentence.hashCode());
 		return new File(tmpDir, Integer.toHexString(hash));
 	}
 	
+	/**
+	 * Serializes a given dependency tree to a specific cache file
+	 */
 	private void writeTree(SemanticGraph tree, File cacheFile) {
 		try {
 			ObjectOutputStream o = new ObjectOutputStream(new FileOutputStream(cacheFile));
@@ -41,7 +53,10 @@ public class StanfordDependencyParser {
 			e.printStackTrace();
 		}
 	}
-	
+
+	/**
+	 * Deserializes a dependency tree from a specific cache file
+	 */
 	private SemanticGraph readTree(File cacheFile) {
 		SemanticGraph tree = null;
 		try {
@@ -59,6 +74,9 @@ public class StanfordDependencyParser {
 		return tree;
 	}
 	
+	/**
+	 * Parse the given sentence and return a collapsed dependency tree
+	 */
 	public SemanticGraph parse(String sentence) {
 		File cacheFile = getCacheFile(sentence);
 		if (cacheFile.exists()) {

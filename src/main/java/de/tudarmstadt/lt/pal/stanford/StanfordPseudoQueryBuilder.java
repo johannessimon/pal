@@ -13,19 +13,24 @@ import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
 
-
+/**
+ * Builds pseudo queries using stanford dependency trees.
+ */
 public class StanfordPseudoQueryBuilder {
-	KnowledgeBaseConnector kb = new KnowledgeBaseConnector(/*"/Users/jsimon/No-Backup/dbpedia/data", "http://dbpedia.org/sparql"*/);
+	KnowledgeBaseConnector kb;
+	StanfordTripleExtractor tripleExtactor = new StanfordTripleExtractor();
 	
 	public StanfordPseudoQueryBuilder(KnowledgeBaseConnector kb) {
 		this.kb = kb;
 	}
 	
+	/**
+	 * Build a pseudo query from the given dependency tree
+	 */
 	public PseudoQuery buildPseudoQuery(SemanticGraph dependencies) {
-		Set<StanfordTriple> triples = new HashSet<StanfordTriple>();
-		IndexedWord root = dependencies.getFirstRoot();
 		Set<IndexedWord> focusWords = new HashSet<IndexedWord>();
-		StanfordTripleExtractor.getTriple(dependencies, root, triples, focusWords);
+		// extractTriples() will add focus words to passed focusWords set
+		Set<StanfordTriple> triples = tripleExtactor.extractTriples(dependencies, focusWords);
 		Map<IndexedWord, SPARQLTriple.Variable> variables = new HashMap<IndexedWord, SPARQLTriple.Variable>();
 		List<SPARQLTriple> queryTriples = new LinkedList<SPARQLTriple>();
 		for (StanfordTriple t : triples) {
@@ -62,13 +67,10 @@ public class StanfordPseudoQueryBuilder {
 		return pseudoQuery;
 	}
 	
-	static String getVariableName(int index) {
-		char firstVar = 'a';
-		firstVar += index;
-		return new String(new char[] { firstVar });
-	}
-	
-	static SPARQLTriple.Variable registerVariable(Map<IndexedWord, SPARQLTriple.Variable> variables, IndexedWord word, SemanticGraph deps, String varType) {
+	/**
+	 * Returns a variable instance representing the given word in the tree, creating a new variable instance if neccessary
+	 */
+	SPARQLTriple.Variable registerVariable(Map<IndexedWord, SPARQLTriple.Variable> variables, IndexedWord word, SemanticGraph deps, String varType) {
 		SPARQLTriple.Variable var = variables.get(word);
 		if (var == null) {
 			String varName = getNodeText(deps, word).replace(' ', '_');
@@ -81,7 +83,13 @@ public class StanfordPseudoQueryBuilder {
 		return var;
 	}
 	
-	public static String getWordTagSuffix(IndexedWord word) {
+	/**
+	 * Determines a POS-tag suffix for the given word
+	 * 
+	 * @return Single-character POS-tag preceded by a '#' (e.g. "#v"),
+	 *         or an empty string if no POS tag is present
+	 */
+	private String getWordTagSuffix(IndexedWord word) {
 		if (word.tag() != null && !word.tag().isEmpty()) {
 			String tag = word.tag().toLowerCase();
 			if (tag.length() > 1) {
@@ -92,7 +100,12 @@ public class StanfordPseudoQueryBuilder {
 		return "";
 	}
 	
-	private static String getNodeText(SemanticGraph deps, IndexedWord word) {
+	/**
+	 * Aggregates the subtree of a given word to a single string,
+	 * taking only certain semantic relations into account
+	 * (noun compounds and modifiers)
+	 */
+	private String getNodeText(SemanticGraph deps, IndexedWord word) {
 		String resStr = "";
 		for (IndexedWord child : deps.getChildren(word)) {
 			List<SemanticGraphEdge> edges = deps.getAllEdges(word, child);
@@ -110,7 +123,12 @@ public class StanfordPseudoQueryBuilder {
 		return resStr;
 	}
 	
-	static SPARQLTriple.Element nodeToSPARQLElement(SemanticGraph deps, Object node, Map<IndexedWord, SPARQLTriple.Variable> variables) {
+	/**
+	 * Determines which representation a given node in a dependency tree has in a SPARQL query (constant or variable).
+	 * 
+	 * In case of a variable, the variable is also added to the variable map passed.
+	 */
+	private SPARQLTriple.Element nodeToSPARQLElement(SemanticGraph deps, Object node, Map<IndexedWord, SPARQLTriple.Variable> variables) {
 		SPARQLTriple.Element res = null;
 		if (node instanceof String) {
 			res = new SPARQLTriple.Constant((String)node, SPARQLTriple.ConstantType.UnmappedConstantType);
@@ -127,19 +145,7 @@ public class StanfordPseudoQueryBuilder {
 				} else {
 					res = new SPARQLTriple.Constant(resStr, SPARQLTriple.ConstantType.UnmappedConstantType);
 				}
-			} /*if (word.tag().startsWith("NNP")) {
-				for (IndexedWord child : deps.getChildren(word)) {
-					List<SemanticGraphEdge> edges = deps.getAllEdges(word, child);
-					for (SemanticGraphEdge e : edges) {
-						if (e.getRelation().getShortName().equals("nn")) {
-							resStr += child.value() + " ";
-							break;
-						}
-					}
-				}
-				resStr += word.value();
-				res = new SPARQLTriple.Constant(resStr, SPARQLTriple.ConstantType.UnmappedConstantType);
-			} */else if (word.tag().startsWith("W")) {
+			} else if (word.tag().startsWith("W")) {
 				if (word.value().toLowerCase().equals("who")) {
 					res = registerVariable(variables, word, deps, "http://dbpedia.org/ontology/Person");
 				} else if (word.value().toLowerCase().equals("where")) {
