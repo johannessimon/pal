@@ -20,16 +20,24 @@ public class StanfordTripleExtractor {
 	 * Builds StanfordTriple's consisting of nodes from a stanford dependency tree (as opposed to SPARQLTriples)
 	 */
 	public Set<StanfordTriple> extractTriples(SemanticGraph deps, Set<IndexedWord> focusWords) {
-		Set<StanfordTriple> triples = new HashSet<>();
+		this.deps = deps;
+		this.focusWords = focusWords;
+		triples = new HashSet<>();
+//		varConstraints = new HashMap<>();
 		IndexedWord root = deps.getFirstRoot();
-		getTriple(deps, root, triples, focusWords);
+		handleNode(root);
 		return triples;
 	}
 	
+	private SemanticGraph deps;
+	private Set<IndexedWord> focusWords;
+	private Set<StanfordTriple> triples;
+//	private Map<IndexedWord, String> varConstraints;
+	
 	/**
-	 * Recursively aggregates triples over dependency graph
+	 * Recursively collect triples over dependency graph
 	 */
-	private StanfordTriple getTriple(SemanticGraph deps, IndexedWord node, Set<StanfordTriple> triples, Set<IndexedWord> focusWords) {
+	private StanfordTriple handleNode(IndexedWord node) {
 		Collection<IndexedWord> children = deps.getChildren(node);
 		// we have a leaf!
 		if (children.isEmpty()) {
@@ -40,7 +48,7 @@ public class StanfordTripleExtractor {
 		IndexedWord predicate = null;
 		IndexedWord object = null;
 		for (IndexedWord child : children) {
-			StanfordTriple childT = getTriple(deps, child, triples, focusWords);
+			StanfordTriple childT = handleNode(child);
 			// If a dependency implies a semantic constraint but does not
 			// specify either subject or object, then this is determined by
 			// the head of the parent dependency
@@ -64,7 +72,16 @@ public class StanfordTripleExtractor {
 			SemanticGraphEdge edge = deps.getAllEdges(node, child).get(0);
 			GrammaticalRelation rel = edge.getRelation();
 			String relName = edge.getRelation().getShortName();
-			if (relName.equals("agent") || relName.equals("dobj")) {
+			// "be" as verb is a special case, as predicate is usually "hidden" in adjective
+			if (node.lemma().equals("be")) {
+				if (child.tag().startsWith("N")) {
+					subject = child;
+				} else if (child.tag().startsWith("J")) {
+//					varConstraints.put(child, "@literal");
+					predicate = child;
+					object = child;
+				}
+			} else if (relName.equals("agent") || relName.equals("dobj")) {
 				predicate = node;
 				object = child;
 			// Special case preposition (reversion of subject/object,
@@ -76,7 +93,6 @@ public class StanfordTripleExtractor {
 				if (node.tag().startsWith("N")) {
 					object = node;
 				}
-//				resultT.predicate = node.lemma() + getWordTagSuffix(node); // no variable! (thus use String object)
 				predicate = node;
 				subject = child;
 			} else if (relName.equals("prep")) {
@@ -84,12 +100,11 @@ public class StanfordTripleExtractor {
 				// verb is part of the relation (predicate)
 				if (node.tag().startsWith("V")) {
 					// TODO: "born in" -> take "bear" as predicate and interprate "in" as dbpedia-owl:Place for target
-//					resultT.predicate = node.lemma() + getWordTagSuffix(node);// + " " + rel.getSpecific();
 					predicate = node;
 				} else {
 					// In this case we don't know anything about the predicate and will use
 					// a wildcard (thus constraint = "there must be a relation between subject/object")
-					predicate = null;///*rel.getSpecific() != null ? rel.getSpecific() : */ "[]";
+					predicate = null;
 					subject = node;
 				}
 				object = child;
@@ -114,7 +129,11 @@ public class StanfordTripleExtractor {
 			}
 		}
 		
-		if (subject != null || predicate != null || object != null) {
+		// There must be at least a subject and an object (no matter if variable or constant),
+		// however the predicate may be a wildcard, i.e. null.
+		// Wildcard predicates will later be replaced by a specific predicate, e.g.
+		// the most common predicate between the subject and the object.
+		if (subject != null && object != null) {
 			StanfordTriple triple = new StanfordTriple(subject, predicate, object);
 			triples.add(triple);
 			return triple;

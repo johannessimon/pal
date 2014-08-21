@@ -2,13 +2,17 @@ package de.tudarmstadt.lt.pal;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import com.hp.hpl.jena.ontology.OntResource;
 import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.Resource;
 
+import de.tudarmstadt.lt.pal.SPARQLTriple.Constant;
+import de.tudarmstadt.lt.pal.SPARQLTriple.Element;
+import de.tudarmstadt.lt.pal.SPARQLTriple.TypeConstraint;
+import de.tudarmstadt.lt.pal.SPARQLTriple.Variable;
 import de.tudarmstadt.lt.pal.util.ComparablePair;
 import de.tudarmstadt.lt.pal.wordnet.WordNetConnector;
 
@@ -25,17 +29,17 @@ public class TripleMapper {
 		this.kb = kb;
 	}
 	
-	private Collection<ComparablePair<Resource, Float>> mapResource(SPARQLTriple.Element e) {
+	private Collection<ComparablePair<Resource, Float>> mapResource(Element e) {
 		List<ComparablePair<Resource, Float>> candidates = null;
 		
-		if (e instanceof SPARQLTriple.Constant) {
-			SPARQLTriple.Constant c = (SPARQLTriple.Constant)e;
-			if (c.type == SPARQLTriple.ConstantType.MappedConstantType) {
+		if (e instanceof Constant) {
+			Constant c = (Constant)e;
+			if (c.type == Constant.Type.Mapped) {
 				candidates = Collections.singletonList(new ComparablePair<Resource, Float>(kb.getResource(e.name), 1.0f));
 			} else {
-				// Get scores for 100 resource candidates and choose best 20
+				// Get scores for 100 resource candidates and choose best N
 				int numCandidates = 100;
-				int numCandidatesFiltered = 20;
+				int numCandidatesFiltered = 3;
 				candidates = kb.getResourceCandidates(e.name, numCandidates);
 				if (candidates.size() > numCandidatesFiltered) {
 					candidates = candidates.subList(0, numCandidatesFiltered);
@@ -45,16 +49,15 @@ public class TripleMapper {
 		return candidates;
 	}
 	
-	private Collection<ComparablePair<Property, Float>> mapProperty(SPARQLTriple.Element p, Resource subject, Resource object) {
-		Collection<ComparablePair<Property, Float>> candidates = new LinkedList<ComparablePair<Property, Float>>();
+	private Collection<ComparablePair<Property, Float>> mapProperty(Element p, Resource subject, Resource object, TypeConstraint subjectTC, TypeConstraint objectTC) {
+		Map<String, Float> synonyms = null;
 		
-		if (p instanceof SPARQLTriple.Constant) {
-			SPARQLTriple.Constant c = (SPARQLTriple.Constant)p;
-			if (c.type == SPARQLTriple.ConstantType.MappedConstantType) {
-				candidates = Collections.singleton(new ComparablePair<Property, Float>(kb.getProperty(p.name), 1.0f));
+		if (p instanceof Constant) {
+			Constant c = (Constant)p;
+			if (c.type == Constant.Type.Mapped) {
+				return Collections.singleton(new ComparablePair<Property, Float>(kb.getProperty(p.name), 1.0f));
 			} else {
 				String nameLC = p.name.toLowerCase();
-				Map<String, Float> synonyms = null;
 				synonyms = new HashMap<>();
 				String pos = null;
 				if (nameLC.contains("#")) {
@@ -64,156 +67,124 @@ public class TripleMapper {
 					wnc.addSynonyms(synonyms, wnc.getSynonyms(nameLC, pos));
 				}
 				wnc.addSynonym(synonyms, nameLC, 1.0f);
-				candidates = kb.getPropertyCandidates(synonyms, subject, object);
 			}
 		}
-		return candidates;
+		
+		return kb.getPropertyCandidates(synonyms, subject, object, subjectTC, objectTC);
+	}
+	
+	private TypeConstraint mapVariableType(Variable var) {
+		TypeConstraint.BasicType basicType = null;
+		String typeURI = null;
+		switch (var.type) {
+		case Agent:
+			basicType = TypeConstraint.BasicType.Resource;
+			typeURI = "dbpedia-owl:Person";
+			break;
+		case Place:
+			basicType = TypeConstraint.BasicType.Resource;
+			typeURI = "dbpedia-owl:Place";
+			break;
+		case Date:
+			basicType = TypeConstraint.BasicType.Literal;
+			typeURI = "xsd:date";
+			break;
+		case Literal:
+			basicType = TypeConstraint.BasicType.Literal;
+			typeURI = null;
+			break;
+		case Unknown:
+			Collection<Resource> typeCandidates = kb.getTypeCandidates(var.name);
+			if (typeCandidates != null && !typeCandidates.isEmpty()) {
+				Resource r = typeCandidates.iterator().next();
+				OntResource or = kb.getOntResource(r);
+				if (or != null && or.isClass()) {
+					basicType = TypeConstraint.BasicType.Resource;
+				} else if (or != null && or.isDataRange()) {
+					basicType = TypeConstraint.BasicType.Literal;
+				}
+				typeURI = or.getURI();
+			}
+		}
+		if (basicType != null) {
+			return new TypeConstraint(basicType, typeURI);
+		}
+		return null;
 	}
 	
 	public String buildSPARQLQuery(PseudoQuery pseudoQuery) {
+		Map<Variable, TypeConstraint> varTypeConstraints = new HashMap<>();
+		for (Variable var : pseudoQuery.vars.values()) {
+			varTypeConstraints.put(var, mapVariableType(var));
+		}
+		
+		final float NO_TYPE_CONSTRAINT_PENALTY = 0.1f;
+		ComparablePair<String, Float> queryWithConstraints = buildSPARQLQuery(pseudoQuery, varTypeConstraints);
+		ComparablePair<String, Float> queryWithoutConstraints = buildSPARQLQuery(pseudoQuery, new HashMap<Variable, TypeConstraint>());
+		queryWithoutConstraints.value *= NO_TYPE_CONSTRAINT_PENALTY;
+		
+		if (queryWithConstraints.value > queryWithoutConstraints.value) {
+			return queryWithConstraints.key;
+		} else {
+			return queryWithoutConstraints.key;
+		}
+	}
+	
+	public ComparablePair<String, Float> buildSPARQLQuery(PseudoQuery pseudoQuery, Map<Variable, TypeConstraint> varTypeConstraints) {
 		System.out.println("Building sparql query for pseudo query:");
 		System.out.println(pseudoQuery);
 		String query = "";
-		int tripleIndex = 0;
-
-		for (SPARQLTriple.Variable var : pseudoQuery.vars.values()) {
-			String mappedType = null;
-			if (var.typeName.contains(":")) {
-				mappedType = var.typeName;
-			} else {
-				Collection<Resource> typeCandidates = kb.getTypeCandidates(var.typeName);
-				if (typeCandidates != null && !typeCandidates.isEmpty()) {
-					mappedType = typeCandidates.iterator().next().toString();
-				}
-			}
-			
-			var.typeName = mappedType;
-		}
+		float score = 1.0f;
 		
 		for (SPARQLTriple t : pseudoQuery.triples) {
-			tripleIndex++;
-			
-			String subjectType = t.subject.typeName;
-			String objectType = t.object.typeName;
-			ComparablePair<String, Float> tripleQuery = buildSPARQLTriple(t, tripleIndex);
-			
+			ComparablePair<String, Float> tripleQuery = buildSPARQLTriple(t, varTypeConstraints);
 			// Try again with subject and object swapped
-			
-			// Remember whether with or without type constraint was better
-			String subjectTypeBest = t.subject.typeName;
-			String objectTypeBest = t.object.typeName;
-			t.subject.typeName = subjectType;
-			t.object.typeName = objectType;
-			SPARQLTriple.Element oldSubject = t.subject;
-			t.subject = t.object;
-			t.object = oldSubject;
-			// Restore types
-			ComparablePair<String, Float> _tripleQuery = buildSPARQLTriple(t, tripleIndex);
-			// First try
-			if (tripleQuery == null) {
+			SPARQLTriple tSwapped = new SPARQLTriple(t.object, t.predicate, t.subject);
+			ComparablePair<String, Float> _tripleQuery = buildSPARQLTriple(tSwapped, varTypeConstraints);
+			if (_tripleQuery.value > tripleQuery.value) {
 				tripleQuery = _tripleQuery;
-			// Second try
-			} else {
-				// Replace if better
-				if (_tripleQuery.value > tripleQuery.value) {
-					tripleQuery = _tripleQuery;
-				// Restore type constraints if worse
-				} else {
-					// subject/object are still swapped
-					t.object.typeName = subjectTypeBest;
-					t.subject.typeName = objectTypeBest;
-				}
 			}
 				
 			String tripleQueryStr = tripleQuery.key;
+			score *= tripleQuery.value;
 
 			// We were unable to map one of the triples -> fail
 			if (tripleQueryStr == null) {
-				return null;
+				return new ComparablePair<>(null, 0.0f);
 			}
 			query += tripleQueryStr;
 		}
 
 		String finalQuery = "SELECT DISTINCT ";
-		for (SPARQLTriple.Variable var : pseudoQuery.vars.values()) {
+		for (Variable var : pseudoQuery.vars.values()) {
 			finalQuery += "?" + var.name + " ";
 			
-			if (var.typeName != null) {
-				query += "?" + var.name + " a " + kb.getSPARQLResourceString(var.typeName) + " . ";
+			TypeConstraint tc = varTypeConstraints.get(var);
+			if (tc != null) {
+				query += kb.getTypeConstraintSPARQLString(tc, var.name);
 			}
 		}
 
 		finalQuery += "WHERE { " + query + " }";
-		return finalQuery;
+		return new ComparablePair<>(finalQuery, score);
 	}
 	
-	ComparablePair<String, Float> buildSPARQLTriple(SPARQLTriple t, int tripleIndex) {
-		System.out.println("======== buildSPARQLTriple(SPARQLTriple, int) =========");
-		Collection<ComparablePair<Resource, Float>> subjectCandidates = mapResource(t.subject);
-		Collection<ComparablePair<Resource, Float>> objectCandidates = mapResource(t.object);
-		System.out.println("subject type: " + t.subject.typeName);
-		System.out.println("object type: " + t.object.typeName);
-		System.out.println("subjectCandidates (" + t.subject + "): " + subjectCandidates);
-		System.out.println("objectCandidates (" + t.object + "): " + objectCandidates);
-		
-		// Used to restore types later if necessary
-		String subjectType = t.subject.typeName;
-		String objectType = t.object.typeName;
-		
-		ComparablePair<String, Float> tripleQuery = null;
-		// Try once with type constraints and if this doesn't work without type constraints
-		// (i.e. 2 times max.)
-		for (int tryNo = 0; tryNo < 2; tryNo++) {
-			System.out.println("=== try " + tryNo);
-			ComparablePair<String, Float> _tripleQuery = buildSPARQLTriple(t, subjectCandidates, objectCandidates);
-			if (tryNo == 1) {
-				float noTypeConstraintPenalty = 0.1f;
-				// Of course there will be at least as well scored results without type constraints,
-				// we have to assign a penalty to make these results comparable somehow
-				_tripleQuery.value *= noTypeConstraintPenalty;
-			}
-			System.out.println("=== result: " + _tripleQuery);
-			// First try
-			if (tryNo == 0) {
-				tripleQuery = _tripleQuery;
-				
-				if (t.subject.typeName != null || t.object.typeName != null) {
-					t.subject.typeName = null;
-					t.object.typeName = null;
-				} else {
-					break;
-				}
-			// Second try, better than first try
-			} else if (_tripleQuery.value > tripleQuery.value) {
-				tripleQuery = _tripleQuery;
-			// Second try, *not* better than first try
-			} else {
-				// Restore types
-				t.subject.typeName = subjectType;
-				t.object.typeName = objectType;
-			}
-		}
-		
-		return tripleQuery;
-	}
-	
-	ComparablePair<String, Float> buildSPARQLTriple(SPARQLTriple triple,
-			                 Collection<ComparablePair<Resource, Float>> subjectCandidates,
-			                 Collection<ComparablePair<Resource, Float>> objectCandidates) {
+	ComparablePair<String, Float> buildSPARQLTriple(SPARQLTriple triple, Map<Variable, TypeConstraint> varTypeConstraints) {
 		Resource rMax = null;
 		Property pMax = null;
 		float maxScore = 0;
+
+		Collection<ComparablePair<Resource, Float>> subjectCandidates = mapResource(triple.subject);
+		Collection<ComparablePair<Resource, Float>> objectCandidates = mapResource(triple.object);
 		
 		String tripleQuery = null;
 		if (subjectCandidates != null) {
 			for (ComparablePair<Resource, Float> scoredSubject : subjectCandidates) {
 				Resource subject = scoredSubject.key;
-				Resource objectType = null;
-				if (triple.object.typeName != null) {
-					objectType = kb.getResource(triple.object.typeName);
-				}
-						
-				Collection<ComparablePair<Property, Float>> propCandidates = mapProperty(triple.predicate, subject, objectType);
+				// Only returns type constraint != null if object is a variable and has been assigned a type constraint
+				TypeConstraint objectTC = varTypeConstraints.get(triple.object);
+
+				Collection<ComparablePair<Property, Float>> propCandidates = mapProperty(triple.predicate, subject, null, null, objectTC);
 				System.out.println("prop candidates: " + propCandidates);
 				for (ComparablePair<Property, Float> scoredProp : propCandidates) {
 					Property prop = scoredProp.key;
@@ -233,12 +204,10 @@ public class TripleMapper {
 		} else if (objectCandidates != null) {
 			for (ComparablePair<Resource, Float> scoredObject : objectCandidates) {
 				Resource object = scoredObject.key;
-				Resource subjectType = null;
-				if (triple.subject.typeName != null) {
-					subjectType = kb.getResource(triple.subject.typeName);
-				}
+				// Only returns type constraint != null if object is a variable and has been assigned a type constraint
+				TypeConstraint subjectTC = varTypeConstraints.get(triple.subject);
 						
-				Collection<ComparablePair<Property, Float>> propCandidates = mapProperty(triple.predicate, subjectType, object);
+				Collection<ComparablePair<Property, Float>> propCandidates = mapProperty(triple.predicate, null, object, subjectTC, null);
 				System.out.println("prop candidates: " + propCandidates);
 				for (ComparablePair<Property, Float> scoredProp : propCandidates) {
 					Property prop = scoredProp.key;
@@ -257,6 +226,6 @@ public class TripleMapper {
 			}
 		}
 		
-		return new ComparablePair<String, Float>(tripleQuery, maxScore);
+		return new ComparablePair<>(tripleQuery, maxScore);
 	}
 }

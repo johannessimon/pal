@@ -60,11 +60,11 @@ public class WordNetConnector {
 		} else if (posStr.startsWith("a")) {
 			pos = POS.ADVERB;
 		} else {
-			return null;
+			return new HashMap<>();
 		}
 		IIndexWord idxWord = dict.getIndexWord(word, pos);
 		if (idxWord == null) {
-			return null;
+			return new HashMap<>();
 		}
 		for (IWordID wordID : idxWord.getWordIDs()) {
 			IWord w = dict.getWord(wordID);

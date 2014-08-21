@@ -1,35 +1,20 @@
 package de.tudarmstadt.lt.pal;
 
+
 /**
  * Represents a triple that can be used in a SPARQL query. May contain
  * yet unmapped properties/resources.
  */
 public class SPARQLTriple {
-	public enum ConstantType {
-		/**
-		 * A constant that has not been mapped to an ontology
-		 * (e.g. "author" or "Dan Brown")
-		 **/
-		MappedConstantType,
-		/**
-		 * A constant that has been mapped to an ontology
-		 * (e.g. "dbpedia-owl:author" or "dbpedia:Dan_Brown")
-		 **/
-		UnmappedConstantType
-	}
 	
-	public static class Element {
+	public static abstract class Element {
 		public String name;
-		// variables as well as constants may be typed
-		public String typeName = null;
-		
+
 		@Override
 		public int hashCode() {
 			final int prime = 31;
 			int result = 1;
 			result = prime * result + ((name == null) ? 0 : name.hashCode());
-			result = prime * result
-					+ ((typeName == null) ? 0 : typeName.hashCode());
 			return result;
 		}
 
@@ -47,53 +32,117 @@ public class SPARQLTriple {
 					return false;
 			} else if (!name.equals(other.name))
 				return false;
-			if (typeName == null) {
-				if (other.typeName != null)
-					return false;
-			} else if (!typeName.equals(other.typeName))
-				return false;
 			return true;
 		}
 	}
 	
-	public static class Constant extends Element {
-		public ConstantType type;
+	public static class TypeConstraint {
+		public enum BasicType {
+			Resource,
+			Literal
+		}
+		BasicType basicType;
+		String typeURI;
 		
-		public Constant(String name, ConstantType type) {
+		public TypeConstraint(BasicType basicType, String typeURI) {
+			this.basicType = basicType;
+			this.typeURI = typeURI;
+		}
+	}
+	
+	public static class Constant extends Element {
+		public enum Type {
+			/**
+			 * A constant that has not been mapped to an ontology
+			 * (e.g. "author" or "Dan Brown")
+			 **/
+			Mapped,
+			/**
+			 * A constant that has been mapped to an ontology
+			 * (e.g. "dbpedia-owl:author" or "dbpedia:Dan_Brown")
+			 **/
+			Unmapped
+		}
+		
+		public Type type;
+		
+		public Constant(String name, Type type) {
 			this.name = name;
 			this.type = type;
 		}
 		
 		public String toString() {
-			if (type == ConstantType.MappedConstantType) {
+			if (type == Type.Mapped) {
 				// dbpedia-owl:Agent vs. <http://dbpedia.org/ontology/Agent>
 				return name.contains(":") ? name : "<" + name + ">";
 			} else /*if (type == ConstantType.UnmappedConstantType)*/ {
 				return "\"" + name + "\"";
 			}
 		}
-		
+
 		@Override
-		public boolean equals(Object other) {
-			if (!super.equals(other)) {
+		public int hashCode() {
+			final int prime = 31;
+			int result = super.hashCode();
+			result = prime * result + ((type == null) ? 0 : type.hashCode());
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (!super.equals(obj))
 				return false;
-			}
-			Constant otherC = (Constant)other;
-			if (otherC == null) {
+			if (getClass() != obj.getClass())
 				return false;
-			}
-			return this.type == otherC.type;
+			Constant other = (Constant) obj;
+			if (type != other.type)
+				return false;
+			return true;
 		}
 	}
 	
 	public static class Variable extends Element {
-		public Variable(String name, String type) {
+		public enum Type {
+			Agent,
+			Date,
+			Place,
+			Literal,
+			Unknown
+		}
+		
+		Type type;
+		
+		public Variable(String name, Type type) {
 			this.name = name;
-			this.typeName = type;
+			this.type = type;
 		}
 		
 		public String toString() {
 			return "?" + name;
+		}
+
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = super.hashCode();
+			result = prime * result + ((type == null) ? 0 : type.hashCode());
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (!super.equals(obj))
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			Variable other = (Variable) obj;
+			if (type != other.type)
+				return false;
+			return true;
 		}
 	}
 	
@@ -110,7 +159,7 @@ public class SPARQLTriple {
 	public String toString() {
 		return "[Subject: " + subject + "] [Predicate: " + predicate + "] [Object: " + object + "]";
 	}
-	
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;

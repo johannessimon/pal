@@ -24,11 +24,11 @@ public class PseudoQuery {
 			sb.append("\n");
 		}
 		for (SPARQLTriple.Variable var : vars.values()) {
-			if (var.typeName != null) {
+			if (var.type != null) {
 				sb.append("   [?");
 				sb.append(var.name);
 				sb.append(" TYPE ");
-				sb.append(var.typeName);
+				sb.append(var.type);
 				sb.append("]\n");
 			}
 		}

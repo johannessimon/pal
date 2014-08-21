@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -87,7 +88,7 @@ public class QALD2MapTest {
 			break;
 		case Number:
 			assertTrue(firstAnswer != null);
-			assertEquals(entry.answerNumber, NumberFormat.getInstance().parse(firstAnswer));
+			assertEquals(entry.answerNumber, NumberFormat.getInstance(Locale.US).parse(firstAnswer));
 			break;
 		}
 	}

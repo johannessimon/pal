@@ -29,6 +29,8 @@ import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
 import com.hp.hpl.jena.vocabulary.RDF;
 
+import de.tudarmstadt.lt.pal.SPARQLTriple.TypeConstraint;
+import de.tudarmstadt.lt.pal.SPARQLTriple.TypeConstraint.BasicType;
 import de.tudarmstadt.lt.pal.util.ComparablePair;
 
 /**
@@ -61,11 +63,11 @@ public class KnowledgeBaseConnector {
 	 * known namespace prefixes.
 	 */
 	public String getSPARQLResourceString(String uri) {
-		Resource r = getResource(uri);
-		if (r == null) {
-			return uri;
+		// Attempt to shorten URI using known prefixes
+		if (uri.startsWith("http://")) {
+			return getSPARQLResourceString(getResource(uri));
 		}
-		return getSPARQLResourceString(r);
+		return uri;
 	}
 	
 	/**
@@ -200,6 +202,10 @@ public class KnowledgeBaseConnector {
 		StringBuilder formattedName = new StringBuilder();
 		for (int i = 0; i < name.length(); i++) {
 			char c = name.charAt(i);
+			if (c == '_') {
+				formattedName.append(' ');
+				continue;
+			}
 			if (Character.isUpperCase(c) && i > 0) {
 				formattedName.append(' ');
 			}
@@ -211,7 +217,7 @@ public class KnowledgeBaseConnector {
 	}
 	
 	Collection<Resource> getTypeCandidates(String name) {
-		String nameLC = name.toLowerCase();
+		name = formatTypeName(name);
 		Collection<Resource> types = new LinkedList<Resource>();
 		Resource classResource = getResource("http://www.w3.org/2002/07/owl#Class");
 		Property labelProperty = getProperty("http://www.w3.org/2000/01/rdf-schema#label");
@@ -220,7 +226,7 @@ public class KnowledgeBaseConnector {
 			Statement stmt = it.next();
 			Resource type = stmt.getSubject();
 			String typeName = formatTypeName(type.getLocalName());
-			if (typeName.equals(nameLC)) {
+			if (typeName.equals(name)) {
 				types.add(type);
 				continue;
 			}
@@ -231,14 +237,26 @@ public class KnowledgeBaseConnector {
 				if (labelStmt.getObject() != null) {
 					Literal label = labelStmt.getObject().asLiteral();
 					if (label.getLanguage() == "en" &&
-						label.getString().toLowerCase().equals(nameLC)) {
+						label.getString().toLowerCase().equals(name)) {
 						types.add(type);
 						break;
 					}
 				}
 			}
 		}
+		System.out.println("type candidates for \"" + name + "\": " + types);
 		return types;
+	}
+	
+	private String getResourceName(String uri) {
+		if(uri.contains("#")) {
+			int sepIndex = uri.lastIndexOf("#");
+			return uri.substring(sepIndex + 1);
+		} else if (uri.contains("/")) {
+			int sepIndex = uri.lastIndexOf("/");
+			return uri.substring(sepIndex + 1);
+		}
+		return uri;
 	}
 	
 	List<ComparablePair<Resource, Float>> getResourceCandidates(String name, int limit) {
@@ -271,7 +289,8 @@ public class KnowledgeBaseConnector {
 					Resource r = soln.getResource("subject");
 					if (r != null) {
 						float labelScore = (float)name.length() / rName.length();
-						float resourceNameScore = 1.0f - (float)Math.abs(r.getLocalName().length() - name.length()) / r.getLocalName().length();
+						String rNameFromURI = getResourceName(r.getURI());
+						float resourceNameScore = 1.0f - (float)Math.abs(rNameFromURI.length() - name.length()) / rNameFromURI.length();
 						float comboScore = labelScore * 0.5f + resourceNameScore * 0.5f;
 						// Assign penalty for inexact matches
 						float inexactMatchPenalty = 0.5f;
@@ -284,8 +303,8 @@ public class KnowledgeBaseConnector {
 			} finally { qexec.close(); }
 		}
 
-		System.out.println("Done searching resources.");
 		Collections.sort(result);
+		System.out.println("Done searching resources. Results: " + result);
 		return result;
 	}
 	
@@ -366,37 +385,46 @@ public class KnowledgeBaseConnector {
 		}
 	}*/
 	
-	Collection<ComparablePair<Property, Float>> getPropertyCandidates(Map<String, Float> nameCandidates, Resource subject, Resource object) {
-		OntResource subjectType = getOntResource(subject);
-		OntResource objectType = getOntResource(object);
-		// Set subject/object is to null iff. it is a variable
-		if (subjectType != null) {
-			subject = null;
+	String getTypeConstraintSPARQLString(TypeConstraint tc, String varName) {
+		if (tc == null) {
+			return "";
+		} else if (tc.basicType == BasicType.Resource) {
+			return "?" + varName + " a " + getSPARQLResourceString(tc.typeURI) + " . ";
+		} else/* if (tc.basicType == BasicType.Literal)*/ {
+			String res = "FILTER(ISLITERAL(?" + varName + ")";
+			if (tc.typeURI != null) {
+				res += " && DATATYPE(?" + varName + ") = " + getSPARQLResourceString(tc.typeURI);
+			}
+			res += ") . ";
+			return res;
 		}
-		if (objectType != null) {
-			object = null;
+	}
+	/*
+	String getSPARQLTypeConstraint(OntResource type, String varName) {
+		if (type == null) {
+			return "";
+		} else if (type.isClass()) {
+			return "?" + varName + " a " + getSPARQLResourceString(type) + " . ";
+		} else if (type.isDataRange()) {
+			return "FILTER(DATATYPE(?" + varName + ") = " + getSPARQLResourceString(type) + ") . ";
 		}
-		boolean subjectIsVar = subject == null;
-		boolean objectIsVar = object == null;
-		
+		return "";
+	}*/
+	
+	Collection<ComparablePair<Property, Float>> getPropertyCandidates(Map<String, Float> nameCandidates, Resource subject, Resource object,
+			                                                          TypeConstraint subjectTC, TypeConstraint objectTC) {
 		String querySubject = subject == null ? "?s" : getSPARQLResourceString(subject);
 		String queryObject = object == null ? "?o" : getSPARQLResourceString(object);
 		String query = "SELECT ?p ";
-		// Count number of property "connections" only if we have exactly one
-		// variable (^ is XOR) and no clue about the property
-		boolean useCountScore = nameCandidates == null && subjectIsVar ^ objectIsVar;
+		// Count number of property "connections" if we have no clue about the property
+		boolean useCountScore = nameCandidates == null;// && subjectIsVar ^ objectIsVar;
 		if (useCountScore) {
-			String countVar = subjectIsVar ? "?s" : "?o";
+			String countVar = subject == null ? "?s" : "?o";
 			query += "(COUNT(" + countVar + ") AS ?count)";
 		}
 		query += " WHERE { " + querySubject + " ?p " + queryObject + " . ";
-//		query += " FROM <http://dbpedia.org> WHERE { " + querySubject + " ?p " + queryObject + " . ";
-		if (subjectType != null) {
-			query += "?s a " + getSPARQLResourceString(subjectType) + " . ";
-		}
-		if (objectType != null) {
-			query += "?o a " + getSPARQLResourceString(objectType) + " . ";
-		}
+		query += getTypeConstraintSPARQLString(subjectTC, "s");
+		query += getTypeConstraintSPARQLString(objectTC, "o");
 		query += "} GROUP BY ?p";
 		QueryExecution qexec = getQueryExec(query);
 				
@@ -421,11 +449,8 @@ public class KnowledgeBaseConnector {
 			if (nameCandidates != null) {
 				for (Entry<String, Float> candidate : nameCandidates.entrySet()) {
 					if (pName.startsWith(candidate.getKey())) {
-//						if (checkTypeConstraint(subjectType, p.getDomain()) &&
-//							checkTypeConstraint(objectType, p.getRange())) {
-							float score = (float)candidate.getKey().length() / pName.length() * candidate.getValue() * countScore;
-							result.add(new ComparablePair<Property, Float>(p, score));
-//						}
+						float score = (float)candidate.getKey().length() / pName.length() * candidate.getValue() * countScore;
+						result.add(new ComparablePair<Property, Float>(p, score));
 					}
 				}
 			} else {

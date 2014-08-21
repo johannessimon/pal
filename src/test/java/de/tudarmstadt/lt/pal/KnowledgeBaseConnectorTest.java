@@ -9,10 +9,10 @@ import junit.framework.TestCase;
 
 import org.junit.Test;
 
-import com.hp.hpl.jena.ontology.OntResource;
 import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.Resource;
 
+import de.tudarmstadt.lt.pal.SPARQLTriple.TypeConstraint;
 import de.tudarmstadt.lt.pal.util.ComparablePair;
 
 public class KnowledgeBaseConnectorTest extends TestCase {
@@ -27,8 +27,8 @@ public class KnowledgeBaseConnectorTest extends TestCase {
 		// maps to dbpedia-owl:author, and matches range constraint
 		nameCandidates.put("author", 1.0f);
 		Resource resource = kb.getResource("http://dbpedia.org/resource/Wikipedia");
-		OntResource range = kb.getOntResource(kb.getResource("http://dbpedia.org/ontology/Person"));
-		Collection<ComparablePair<Property, Float>> propCandidates = kb.getPropertyCandidates(nameCandidates, resource, range);
+		TypeConstraint range = new TypeConstraint(TypeConstraint.BasicType.Resource, "http://dbpedia.org/ontology/Person");
+		Collection<ComparablePair<Property, Float>> propCandidates = kb.getPropertyCandidates(nameCandidates, resource, null, null, range);
 		assertEquals(2, propCandidates.size());
 		ComparablePair<Property, Float> prop1 = new ComparablePair<>(kb.getProperty("http://dbpedia.org/ontology/author"), 1.0f);
 		ComparablePair<Property, Float> prop2 = new ComparablePair<>(kb.getProperty("http://dbpedia.org/property/author"), 1.0f);

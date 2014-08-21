@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.Locale;
 import java.util.Map;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -24,6 +25,8 @@ import org.xml.sax.SAXException;
 
 import de.tudarmstadt.lt.pal.PseudoQuery;
 import de.tudarmstadt.lt.pal.SPARQLTriple;
+import de.tudarmstadt.lt.pal.SPARQLTriple.Constant;
+import de.tudarmstadt.lt.pal.SPARQLTriple.Variable;
 
 /**
  * Parser for the QALD-2 challenge <br/>
@@ -106,7 +109,7 @@ public class QALD2XMLParser {
 							qald2Entry.answerDate = df.parse(answerText);
 							break;
 						case Number:
-							qald2Entry.answerNumber = NumberFormat.getInstance().parse(answerText);
+							qald2Entry.answerNumber = NumberFormat.getInstance(Locale.US).parse(answerText);
 							break;
 						}
 					}
@@ -120,14 +123,14 @@ public class QALD2XMLParser {
 					qald2Entry.pseudoQuery.triples = new HashSet<SPARQLTriple>();
 					Element pseudoQueryElement = (Element)pseudoQueryNode;
 					
-					Map<String, SPARQLTriple.Variable> variables = new HashMap<String, SPARQLTriple.Variable>();
+					Map<String, Variable> variables = new HashMap<String, Variable>();
 					qald2Entry.pseudoQuery.vars = variables;
 					NodeList vars = pseudoQueryElement.getElementsByTagName("var");
 					for (int j = 0; j < vars.getLength(); j++) {
 						Element var = (Element)vars.item(j);
 						String name = var.getAttribute("name");
-						String type = var.getAttribute("type");
-						variables.put(name, new SPARQLTriple.Variable(name, type));
+						Variable.Type type = Variable.Type.valueOf(var.getAttribute("type"));
+						variables.put(name, new Variable(name, type));
 					}
 					
 					NodeList pseudoTriples = pseudoQueryElement.getElementsByTagName("triple");
@@ -144,7 +147,7 @@ public class QALD2XMLParser {
 								} else if (e.equals("[]")) { // Wildcard
 									sparqlElements[k] = null;
 								} else {
-									sparqlElements[k] = new SPARQLTriple.Constant(e, SPARQLTriple.ConstantType.UnmappedConstantType);
+									sparqlElements[k] = new Constant(e, Constant.Type.Unmapped);
 								}
 							}
 							SPARQLTriple sparqlTriple = new SPARQLTriple(sparqlElements[0], sparqlElements[1], sparqlElements[2]);
