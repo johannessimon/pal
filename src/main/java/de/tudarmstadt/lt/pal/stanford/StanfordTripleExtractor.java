@@ -74,10 +74,9 @@ public class StanfordTripleExtractor {
 			String relName = edge.getRelation().getShortName();
 			// "be" as verb is a special case, as predicate is usually "hidden" in adjective
 			if (node.lemma().equals("be")) {
-				if (child.tag().startsWith("N")) {
+				if (relName.contains("subj") || relName.contains("obj")) {
 					subject = child;
-				} else if (child.tag().startsWith("J")) {
-//					varConstraints.put(child, "@literal");
+				} else {
 					predicate = child;
 					object = child;
 				}

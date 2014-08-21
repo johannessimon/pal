@@ -125,7 +125,8 @@ public class KnowledgeBaseConnector {
 	 * Constructor to connect to local Virtuoso server
 	 */
 	public KnowledgeBaseConnector() {
-		sparqlEndpoint = "http://localhost:3030/ds/query";
+//		sparqlEndpoint = "http://localhost:3030/ds/query";
+		sparqlEndpoint = "http://localhost:8001/ds/query"; // nginx cache
 //		Dataset data = TDBFactory.createDataset("/Users/jsimon/No-Backup/dbpedia37/tdb");
 		data = DatasetFactory.assemble(
 			    "/Users/jsimon/No-Backup/dbpedia37/dbpedia37-fuseki.ttl", 
@@ -163,7 +164,7 @@ public class KnowledgeBaseConnector {
 	private QueryExecution getQueryExec(String query) {
 		numQueries++;
 		query = getNamespacePrefixDeclarations() + "\n" + query;
-//		System.out.println(query);
+		System.out.println(query.replaceAll("\n", " "));
 		QueryExecution qexec;
 		if (sparqlEndpoint != null) {
 			qexec = QueryExecutionFactory.sparqlService(sparqlEndpoint, query);
@@ -272,7 +273,7 @@ public class KnowledgeBaseConnector {
 //				               + "  { ?subject rdfs:label ?name . ?name <bif:contains> \"'" + name + "'\"} . \n"
 							   // Important: text:query must come first for pre-filtering (otherwise it takes much longer)
 						       + "  ?subject text:query('" + name + "' " + limit + ") . \n"
-		                       + "  ?subject a owl:Thing . \n"
+//		                       + "  ?subject a owl:Thing . \n"
 							   + "  { ?subject foaf:name ?name . FILTER(langMatches(lang(?name), \"en\") && contains(?name, \"" + name + "\")) }\n"
                                + "  UNION\n"
                                + "  { ?subject rdfs:label ?name . FILTER(langMatches(lang(?name), \"en\") && contains(?name, \"" + name + "\")) }\n"
@@ -426,7 +427,13 @@ public class KnowledgeBaseConnector {
 		query += getTypeConstraintSPARQLString(subjectTC, "s");
 		query += getTypeConstraintSPARQLString(objectTC, "o");
 		query += "} GROUP BY ?p";
-		QueryExecution qexec = getQueryExec(query);
+		QueryExecution qexec;
+		try {
+			qexec = getQueryExec(query);
+		} catch (Exception e) {
+			System.err.println("Error while executing query: " + e.getMessage());
+			return new LinkedList<>();
+		}
 				
 		List<ComparablePair<Property, Float>> result = new LinkedList<ComparablePair<Property, Float>>();
 		ResultSet propPreCandidates = qexec.execSelect();
@@ -439,7 +446,9 @@ public class KnowledgeBaseConnector {
 			}
 			float countScore = 1.0f;
 			if (useCountScore) {
-				countScore = sol.getLiteral("count").getInt();
+				// Use logarithm to avoid an untyped property with 100 items
+				// to be scored as high as a typed property with 10 items
+				countScore = (float)Math.log(sol.getLiteral("count").getInt());
 			}
 			OntProperty p = ontModel.getOntProperty(pRes.getURI());
 			if (p == null) {

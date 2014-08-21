@@ -165,7 +165,8 @@ public class TripleMapper {
 			}
 		}
 
-		finalQuery += "WHERE { " + query + " }";
+		final int RESULT_LIMIT = 1000;
+		finalQuery += "WHERE { " + query + " } LIMIT " + RESULT_LIMIT;
 		return new ComparablePair<>(finalQuery, score);
 	}
 	
