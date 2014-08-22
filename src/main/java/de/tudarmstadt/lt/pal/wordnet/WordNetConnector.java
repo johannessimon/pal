@@ -74,7 +74,7 @@ public class WordNetConnector {
 		// Use hypernyms to find related words, but assign a penalty
 		// as hypernyms are a "bad" way to find synonyms
 		// (human is not a synonym of author, but the other way around)
-		float hypernymPenalty = 0.0f;
+		float hypernymPenalty = 0.1f;
 		for (IWordID wordID : idxWord.getWordIDs()) {
 			IWord w = dict.getWord(wordID);
 			addSynonyms(synonymScores, getHyponyms(w.getSynset(), 3));
@@ -87,8 +87,8 @@ public class WordNetConnector {
 			for (IWordID rWordID : rWordIDs) {
 				IWord rW = dict.getWord(rWordID);
 				addSynonym(synonymScores, rW.getLemma(), 1.0f);
-				addSynonyms(synonymScores, getHyponyms(w.getSynset(), 3));
-				addSynonyms(synonymScores, getHypernyms(w.getSynset(), 3), hypernymPenalty);
+				addSynonyms(synonymScores, getHyponyms(rW.getSynset(), 3));
+				addSynonyms(synonymScores, getHypernyms(rW.getSynset(), 3), hypernymPenalty);
 				
 				// Get direct and transitive synonyms
 				addSynonyms(synonymScores, getSynonyms(rW, 1, 2, w.getLemma() + "->" + rW.getLemma()));
