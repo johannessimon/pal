@@ -454,11 +454,19 @@ public class KnowledgeBaseConnector {
 			if (p == null) {
 				continue;
 			}
+			float propertyTypeScore;
+			// Slightly prefer object properties over non-object properties
+			if (p.isObjectProperty()) {
+				propertyTypeScore = 1.01f;
+			} else {
+				propertyTypeScore = 1.00f;
+			}
+			
 			String pName = p.getLocalName().toLowerCase();
 			if (nameCandidates != null) {
 				for (Entry<String, Float> candidate : nameCandidates.entrySet()) {
 					if (pName.startsWith(candidate.getKey())) {
-						float score = (float)candidate.getKey().length() / pName.length() * candidate.getValue() * countScore;
+						float score = (float)candidate.getKey().length() / pName.length() * candidate.getValue() * countScore * propertyTypeScore;
 						result.add(new ComparablePair<Property, Float>(p, score));
 					}
 				}

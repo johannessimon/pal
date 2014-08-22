@@ -12,6 +12,7 @@ import java.util.Map.Entry;
 import edu.mit.jwi.Dictionary;
 import edu.mit.jwi.IDictionary;
 import edu.mit.jwi.item.IIndexWord;
+import edu.mit.jwi.item.IPointer;
 import edu.mit.jwi.item.ISynset;
 import edu.mit.jwi.item.ISynsetID;
 import edu.mit.jwi.item.IWord;
@@ -34,6 +35,10 @@ public class WordNetConnector {
 	}
 	
 	public void addSynonyms(Map<String, Float> synonyms, Map<String, Float> toAdd) {
+		addSynonyms(synonyms, toAdd, 1.0f);
+	}
+	
+	public void addSynonyms(Map<String, Float> synonyms, Map<String, Float> toAdd, float factor) {
 		for (Entry<String, Float> s : toAdd.entrySet()) {
 			addSynonym(synonyms, s.getKey(), s.getValue());
 		}
@@ -66,9 +71,14 @@ public class WordNetConnector {
 		if (idxWord == null) {
 			return new HashMap<>();
 		}
+		// Use hypernyms to find related words, but assign a penalty
+		// as hypernyms are a "bad" way to find synonyms
+		// (human is not a synonym of author, but the other way around)
+		float hypernymPenalty = 0.0f;
 		for (IWordID wordID : idxWord.getWordIDs()) {
 			IWord w = dict.getWord(wordID);
-			addSynonyms(synonymScores, getHyponyms(w.getSynset()));
+			addSynonyms(synonymScores, getHyponyms(w.getSynset(), 3));
+			addSynonyms(synonymScores, getHypernyms(w.getSynset(), 3), hypernymPenalty);
 			addSynonym(synonymScores, w.getLemma(), 1.0f);
 			// Get direct and transitive synonyms
 			addSynonyms(synonymScores, getSynonyms(w, 1, 2, w.getLemma()));
@@ -77,7 +87,8 @@ public class WordNetConnector {
 			for (IWordID rWordID : rWordIDs) {
 				IWord rW = dict.getWord(rWordID);
 				addSynonym(synonymScores, rW.getLemma(), 1.0f);
-				addSynonyms(synonymScores, getHyponyms(rW.getSynset()));
+				addSynonyms(synonymScores, getHyponyms(w.getSynset(), 3));
+				addSynonyms(synonymScores, getHypernyms(w.getSynset(), 3), hypernymPenalty);
 				
 				// Get direct and transitive synonyms
 				addSynonyms(synonymScores, getSynonyms(rW, 1, 2, w.getLemma() + "->" + rW.getLemma()));
@@ -105,19 +116,22 @@ public class WordNetConnector {
 		return res;
 	}
 	
-	public Map<String, Float> getHyponyms(ISynset s) {
-		return getHyponyms(s, 1);
+	public Map<String, Float> getHypernyms(ISynset s, int maxDepth) {
+		return getRelatedWords(s, 1, maxDepth, Pointer.HYPERNYM);
 	}
 	
-	int maxDepth = 3;
-	public Map<String, Float> getHyponyms(ISynset s, int depth) {
+	public Map<String, Float> getHyponyms(ISynset s, int maxDepth) {
+		return getRelatedWords(s, 1, maxDepth, Pointer.HYPONYM);
+	}
+	
+	public Map<String, Float> getRelatedWords(ISynset s, int depth, int maxDepth, IPointer relationType) {
 		if (depth == maxDepth) {
 			return Collections.emptyMap();
 		}
 		float scoreInThisDepth = 1 - (float)depth / maxDepth;
 		Map<String, Float> res = new HashMap<>();
 //		Map foo = word.getRelatedMap();
-		List<ISynsetID> sIDs = s.getRelatedSynsets(Pointer.HYPONYM);
+		List<ISynsetID> sIDs = s.getRelatedSynsets(relationType);
 		for (ISynsetID sID : sIDs) {
 			ISynset hS = dict.getSynset(sID);
 			for (IWord h : hS.getWords()) {
@@ -126,7 +140,7 @@ public class WordNetConnector {
 //				}
 				addSynonym(res, h.getLemma(), scoreInThisDepth);
 			}
-			addSynonyms(res, getHyponyms(hS, depth + 1));
+			addSynonyms(res, getRelatedWords(hS, depth + 1, maxDepth, relationType));
 		}
 		return res;
 	}
