@@ -199,7 +199,7 @@ public class KnowledgeBaseConnector {
 	 * Formats typical ontology type names like "EuropeanCapital123" in a more
 	 * natural-language conformant format ("european capital")
 	 */
-	private String formatTypeName(String name) {
+	private String formatResourceName(String name) {
 		StringBuilder formattedName = new StringBuilder();
 		for (int i = 0; i < name.length(); i++) {
 			char c = name.charAt(i);
@@ -218,7 +218,7 @@ public class KnowledgeBaseConnector {
 	}
 	
 	Collection<Resource> getTypeCandidates(String name) {
-		name = formatTypeName(name);
+		name = formatResourceName(name);
 		Collection<Resource> types = new LinkedList<Resource>();
 		Resource classResource = getResource("http://www.w3.org/2002/07/owl#Class");
 		Property labelProperty = getProperty("http://www.w3.org/2000/01/rdf-schema#label");
@@ -226,7 +226,7 @@ public class KnowledgeBaseConnector {
 		while (it.hasNext()) {
 			Statement stmt = it.next();
 			Resource type = stmt.getSubject();
-			String typeName = formatTypeName(type.getLocalName());
+			String typeName = formatResourceName(type.getLocalName());
 			if (typeName.equals(name)) {
 				types.add(type);
 				continue;
@@ -330,9 +330,13 @@ public class KnowledgeBaseConnector {
 				QuerySolution soln = results.nextSolution();
 				RDFNode var = soln.get(focusVariable);
 				if (var != null) {
-					String varString = var.toString();
+					String varString = null;
 					if (var.isResource()) {
-						varString = URLDecoder.decode(varString, "UTF-8");
+						Resource r = var.asResource();
+						varString = URLDecoder.decode(r.getURI(), "UTF-8");
+					} if (var.isLiteral()) {
+						Literal l = var.asLiteral();
+						varString = l.getValue().toString();
 					}
 					System.out.println(varString);
 					res.add(varString);
@@ -418,7 +422,7 @@ public class KnowledgeBaseConnector {
 		String queryObject = object == null ? "?o" : getSPARQLResourceString(object);
 		String query = "SELECT ?p ";
 		// Count number of property "connections" if we have no clue about the property
-		boolean useCountScore = nameCandidates == null;// && subjectIsVar ^ objectIsVar;
+		boolean useCountScore = true;//nameCandidates == null;// && subjectIsVar ^ objectIsVar;
 		if (useCountScore) {
 			String countVar = subject == null ? "?s" : "?o";
 			query += "(COUNT(" + countVar + ") AS ?count)";
@@ -444,11 +448,13 @@ public class KnowledgeBaseConnector {
 			if (pRes == null) {
 				break;
 			}
-			float countScore = 1.0f;
+			// Assign a very small bonus for higher number of connections
+			// -> should only make a difference for near-tie situations
+			float countScoreBonus = 0.0f;
 			if (useCountScore) {
 				// Use logarithm to avoid an untyped property with 100 items
 				// to be scored as high as a typed property with 10 items
-				countScore = (float)Math.log(sol.getLiteral("count").getInt());
+				countScoreBonus = 0.00001f * (float)Math.log(1 + sol.getLiteral("count").getInt());
 			}
 			OntProperty p = ontModel.getOntProperty(pRes.getURI());
 			if (p == null) {
@@ -462,16 +468,16 @@ public class KnowledgeBaseConnector {
 				propertyTypeScore = 1.00f;
 			}
 			
-			String pName = p.getLocalName().toLowerCase();
+			String pName = formatResourceName(p.getLocalName());
 			if (nameCandidates != null) {
 				for (Entry<String, Float> candidate : nameCandidates.entrySet()) {
 					if (pName.startsWith(candidate.getKey())) {
-						float score = (float)candidate.getKey().length() / pName.length() * candidate.getValue() * countScore * propertyTypeScore;
+						float score = (float)candidate.getKey().length() / pName.length() * candidate.getValue() * propertyTypeScore + countScoreBonus;
 						result.add(new ComparablePair<Property, Float>(p, score));
 					}
 				}
 			} else {
-				result.add(new ComparablePair<Property, Float>(p, countScore));
+				result.add(new ComparablePair<Property, Float>(p, countScoreBonus));
 			}
 		}
 		Collections.sort(result);
