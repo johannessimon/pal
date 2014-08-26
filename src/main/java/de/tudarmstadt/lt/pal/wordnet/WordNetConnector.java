@@ -116,18 +116,21 @@ public class WordNetConnector {
 	}
 	
 	public Map<String, Float> getHypernyms(ISynset s, int maxDepth) {
-		return getRelatedWords(s, 1, maxDepth, Pointer.HYPERNYM);
+		return getRelatedWords(s, 1, maxDepth, Pointer.HYPERNYM, true);
 	}
 	
 	public Map<String, Float> getHyponyms(ISynset s, int maxDepth) {
-		return getRelatedWords(s, 1, maxDepth, Pointer.HYPONYM);
+		return getRelatedWords(s, 1, maxDepth, Pointer.HYPONYM, false);
 	}
 	
-	public Map<String, Float> getRelatedWords(ISynset s, int depth, int maxDepth, IPointer relationType) {
+	public Map<String, Float> getRelatedWords(ISynset s, int depth, int maxDepth, IPointer relationType, boolean assignDepthPenalty) {
 		if (depth == maxDepth) {
 			return Collections.emptyMap();
 		}
-		float scoreInThisDepth = 1 - (float)depth / maxDepth;
+		float scoreInThisDepth = 1.0f;
+		if (assignDepthPenalty) {
+			scoreInThisDepth -= (float)depth / maxDepth;
+		}
 		Map<String, Float> res = new HashMap<>();
 //		Map foo = word.getRelatedMap();
 		List<ISynsetID> sIDs = s.getRelatedSynsets(relationType);
@@ -139,7 +142,7 @@ public class WordNetConnector {
 //				}
 				addSynonym(res, h.getLemma(), scoreInThisDepth);
 			}
-			addSynonyms(res, getRelatedWords(hS, depth + 1, maxDepth, relationType));
+			addSynonyms(res, getRelatedWords(hS, depth + 1, maxDepth, relationType, assignDepthPenalty));
 		}
 		return res;
 	}

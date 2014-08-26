@@ -138,6 +138,7 @@ public class StanfordPseudoQueryBuilder {
 	 */
 	private String getNodeText(SemanticGraph deps, IndexedWord word) {
 		String resStr = "";
+//		boolean namedEntityCandidate = Character.isUpperCase(word.value().charAt(0));
 		for (IndexedWord child : deps.getChildren(word)) {
 			if (ignoredWords.contains(child.lemma().toLowerCase())) {
 				continue;
