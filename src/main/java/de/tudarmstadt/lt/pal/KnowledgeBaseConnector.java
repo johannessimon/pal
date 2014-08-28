@@ -322,6 +322,8 @@ public class KnowledgeBaseConnector {
 						result.add(new ComparablePair<Resource, Float>(r, comboScore));
 					}
 				}
+			} catch (Exception e) {
+				e.printStackTrace();
 			} finally { qexec.close(); }
 		}
 
@@ -471,15 +473,16 @@ public class KnowledgeBaseConnector {
 		}
 		query += " LIMIT 100";
 		QueryExecution qexec;
+		ResultSet propPreCandidates;
 		try {
 			qexec = getQueryExec(query);
+			propPreCandidates = qexec.execSelect();
 		} catch (Exception e) {
 			System.err.println("Error while executing query: " + e.getMessage());
 			return new LinkedList<>();
 		}
 				
 		List<ComparablePair<Property, Float>> result = new LinkedList<ComparablePair<Property, Float>>();
-		ResultSet propPreCandidates = qexec.execSelect();
 		while (propPreCandidates.hasNext()) {
 			QuerySolution sol = propPreCandidates.next();
 			Resource pRes = sol.getResource("p");

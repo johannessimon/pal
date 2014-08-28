@@ -2,9 +2,9 @@ package de.tudarmstadt.lt.pal.qald2;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
-import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.Collection;
@@ -24,6 +24,7 @@ import org.xml.sax.SAXException;
 
 import de.tudarmstadt.lt.pal.KnowledgeBaseConnector;
 import de.tudarmstadt.lt.pal.TripleMapper;
+import de.tudarmstadt.lt.pal.util.DateUtil;
 
 @RunWith(Parameterized.class)
 public class QALD2MapTest {
@@ -79,12 +80,13 @@ public class QALD2MapTest {
 			assertEquals(entry.answerString, firstAnswer);
 			break;
 		case Boolean:
+			fail(); // Not implemented yet
 			assertTrue(firstAnswer != null);
 			assertEquals(entry.answerBoolean, Boolean.parseBoolean(firstAnswer));
 			break;
 		case Date:
 			assertTrue(firstAnswer != null);
-			assertEquals(entry.answerDate, DateFormat.getInstance().parse(firstAnswer));
+			assertEquals(entry.answerDate, DateUtil.parseDate(firstAnswer));
 			break;
 		case Number:
 			assertTrue(firstAnswer != null);

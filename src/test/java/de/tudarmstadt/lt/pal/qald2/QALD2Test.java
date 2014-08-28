@@ -2,9 +2,9 @@ package de.tudarmstadt.lt.pal.qald2;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
-import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.Collection;
@@ -27,6 +27,7 @@ import de.tudarmstadt.lt.pal.PseudoQuery;
 import de.tudarmstadt.lt.pal.TripleMapper;
 import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
 import de.tudarmstadt.lt.pal.stanford.StanfordPseudoQueryBuilder;
+import de.tudarmstadt.lt.pal.util.DateUtil;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 
@@ -88,12 +89,13 @@ public class QALD2Test {
 			assertEquals(entry.answerString, firstAnswer);
 			break;
 		case Boolean:
+			fail(); // Not implemented yet
 			assertTrue(firstAnswer != null);
 			assertEquals(entry.answerBoolean, Boolean.parseBoolean(firstAnswer));
 			break;
 		case Date:
 			assertTrue(firstAnswer != null);
-			assertEquals(entry.answerDate, DateFormat.getInstance().parse(firstAnswer));
+			assertEquals(entry.answerDate, DateUtil.parseDate(firstAnswer));
 			break;
 		case Number:
 			assertTrue(firstAnswer != null);
