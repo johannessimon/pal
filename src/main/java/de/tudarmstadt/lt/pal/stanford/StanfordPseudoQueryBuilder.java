@@ -133,6 +133,11 @@ public class StanfordPseudoQueryBuilder {
 		String resStr = "";
 //		boolean namedEntityCandidate = Character.isUpperCase(word.value().charAt(0));
 		for (IndexedWord child : deps.getChildren(word)) {
+			// Ignore words to the right (e.g. "video games published" will have
+			// "published" as dependency on "games")
+			if (child.index() > word.index()) {
+				continue;
+			}
 			if (ignoredWords.contains(child.lemma().toLowerCase())) {
 				continue;
 			}
@@ -147,7 +152,16 @@ public class StanfordPseudoQueryBuilder {
 				}
 			}
 		}
-		resStr += word.lemma();//word.value();
+		char firstChar = word.value().charAt(0);
+		// Words starting with an uppercase letter are often entities,
+		// e.g. "Mean Hamster Software" vs. "video games"
+		// here the first should stay as it is, whereas the second
+		// should be normalized to "video game"
+		if (Character.isUpperCase(firstChar)) {
+			resStr += word.value();
+		} else {
+			resStr += word.lemma();
+		}
 		return resStr;
 	}
 	
