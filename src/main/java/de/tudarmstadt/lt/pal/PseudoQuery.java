@@ -3,6 +3,8 @@ package de.tudarmstadt.lt.pal;
 import java.util.Collection;
 import java.util.Map;
 
+import de.tudarmstadt.lt.pal.SPARQLTriple.Variable;
+
 /**
  * A pseudo query is a collection of (unmapped) <code>SPARQLTriple</code>'s.<br/>
  * For convenience, it also contains a map of all variables used in the triples.
@@ -12,7 +14,8 @@ public class PseudoQuery {
 	/**
 	 * Map of (variable name -> SPARQL variable) pairs
 	 */
-	public Map<String, SPARQLTriple.Variable> vars;
+	public Map<String, Variable> vars;
+	public Variable focusVar = null;
 	
 	@Override
 	public String toString() {
@@ -23,7 +26,7 @@ public class PseudoQuery {
 			sb.append(t);
 			sb.append("\n");
 		}
-		for (SPARQLTriple.Variable var : vars.values()) {
+		for (Variable var : vars.values()) {
 			if (var.type != null) {
 				sb.append("   [?");
 				sb.append(var.name);

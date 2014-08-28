@@ -64,11 +64,11 @@ public class QALD2Test {
 		SemanticGraph dependencies = depParser.parse(entry.question);
 		PseudoQuery pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
 
-		String query = tripleMapper.buildSPARQLQuery(pseudoQuery);
+		String query = tripleMapper.getBestSPARQLQuery(pseudoQuery);
 		assertTrue(query != null);
 		System.out.println("QUERY: " + query);
 		System.out.println("======= ANSWER =======");
-		String focusVar = pseudoQuery.vars.keySet().iterator().next();
+		String focusVar = pseudoQuery.focusVar.name;
 		try {
 			System.out.println("?" + focusVar + ":");
 			answers.addAll(kb.query(query, focusVar));

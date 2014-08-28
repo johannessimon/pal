@@ -48,15 +48,14 @@ public class NLI {
 		PseudoQuery pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
 		System.out.println("PSEUDO QUERY: " + pseudoQuery);
 
-		String query = tripleMapper.buildSPARQLQuery(pseudoQuery);
+		String query = tripleMapper.getBestSPARQLQuery(pseudoQuery);
 		System.out.println("QUERY: " + query);
 		System.out.println("======= ANSWER =======");
 		try {
-			for (String var : pseudoQuery.vars.keySet()) {
-				System.out.println("?" + var + ":");
-				Collection<String> _answers = kb.query(query, var);
-				answers.addAll(_answers);
-			}
+			String focusVar = pseudoQuery.focusVar.name;
+			System.out.println("?" + focusVar + ":");
+			Collection<String> _answers = kb.query(query, focusVar);
+			answers.addAll(_answers);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

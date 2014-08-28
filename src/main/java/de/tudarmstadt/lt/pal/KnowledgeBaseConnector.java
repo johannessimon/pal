@@ -8,12 +8,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import com.hp.hpl.jena.ontology.OntClass;
 import com.hp.hpl.jena.ontology.OntModel;
 import com.hp.hpl.jena.ontology.OntModelSpec;
 import com.hp.hpl.jena.ontology.OntProperty;
 import com.hp.hpl.jena.ontology.OntResource;
 import com.hp.hpl.jena.query.Dataset;
-import com.hp.hpl.jena.query.DatasetFactory;
 import com.hp.hpl.jena.query.QueryExecution;
 import com.hp.hpl.jena.query.QueryExecutionFactory;
 import com.hp.hpl.jena.query.QuerySolution;
@@ -27,6 +27,7 @@ import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
+import com.hp.hpl.jena.tdb.TDBFactory;
 import com.hp.hpl.jena.vocabulary.RDF;
 
 import de.tudarmstadt.lt.pal.SPARQLTriple.TypeConstraint;
@@ -56,6 +57,16 @@ public class KnowledgeBaseConnector {
 		}
 	
 		return "<" + r.getURI() + ">";
+	}
+	public Resource getResourceFromSPARQLResourceString(String sparqlString) {
+		String uri = sparqlString;
+		for (Entry<String, String> prefix : namespacePrefixes.entrySet()) {
+			if (sparqlString.startsWith(prefix.getValue())) {
+				uri = prefix.getKey() + sparqlString.substring(prefix.getValue().length());
+				break;
+			}
+		}
+		return getResource(uri);
 	}
 	
 	/**
@@ -104,33 +115,41 @@ public class KnowledgeBaseConnector {
 	}
 	
 	/**
-	 * Constructor to connect to local Fuseki server
+	 * Constructor to connect to local Virtuoso server
 	 */
-	/*
-	public KnowledgeBaseConnector() {
+	/*public KnowledgeBaseConnector() {
 		sparqlEndpoint = "http://localhost:8890/sparql/";
-		VirtDataset data = new VirtDataset("jdbc:virtuoso://localhost:1111", "dba", "dba");
+		VirtDataset data = new VirtDataset("jdbc:virtuoso://localhost:1111/charset=UTF-8/", "dba", "dba");
 		data.begin(ReadWrite.READ);
 		model = data.getNamedModel("http://dbpedia.org");
 		ontModel = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM, model);
-//		ontModel.prepare();
-//		Iterator<OntClass> it = ontModel.listClasses();
-//		while (it.hasNext()) {
-//			System.out.println(it.next());
-//		}
+		ontModel.prepare();
+		Iterator<OntProperty> it = ontModel.listOntProperties();
+		Graph g = ontModel.getGraph();
+		while (it.hasNext()) {
+			OntProperty p = it.next();
+			System.out.println(p);
+			Resource r3 = ontModel.getResource(p.getURI());
+			boolean c = ontModel.containsResource(r3);
+			OntResource _r3 = r3.as(OntResource.class);
+			Resource r1 = ontModel.getOntResource(p.getURI());
+			Resource r2 = ontModel.getOntResource(p);
+		}
 		fillNamespacePrefixes();
 	}*/
 	
 	/**
-	 * Constructor to connect to local Virtuoso server
+	 * Constructor to connect to local Fuseki server
 	 */
+	
 	public KnowledgeBaseConnector() {
 //		sparqlEndpoint = "http://localhost:3030/ds/query";
-		sparqlEndpoint = "http://localhost:8001/ds/query"; // nginx cache
-//		Dataset data = TDBFactory.createDataset("/Users/jsimon/No-Backup/dbpedia37/tdb");
-		data = DatasetFactory.assemble(
-			    "/Users/jsimon/No-Backup/dbpedia37/dbpedia37-fuseki.ttl", 
-			    "http://localhost/dbpedia37#text_dataset") ;
+		sparqlEndpoint = "http://localhost:8001/sparql/"; // nginx cache
+//		sparqlEndpoint = "http://localhost:8890/sparql/"; // virtuoso
+		data = TDBFactory.createDataset("/Users/jsimon/No-Backup/dbpedia37/tdb");
+//		data = DatasetFactory.assemble(
+//			    "/Users/jsimon/No-Backup/dbpedia37/dbpedia37-fuseki.ttl", 
+//			    "http://localhost/dbpedia37#text_dataset") ;
 		data.begin(ReadWrite.READ);
 		model = data.getDefaultModel();
 		ontModel = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM, model);
@@ -141,8 +160,8 @@ public class KnowledgeBaseConnector {
 //			System.out.println(it.next());
 //		}
 		fillNamespacePrefixes();
-	}/*
-	
+	}
+	/*
 	public KnowledgeBaseConnector(String tdbDir) {
 		// Create a TDB-backed dataset
 		String modelDir = tdbDir;
@@ -217,35 +236,37 @@ public class KnowledgeBaseConnector {
 		return formattedName.toString();
 	}
 	
-	Collection<Resource> getTypeCandidates(String name) {
-		name = formatResourceName(name);
-		Collection<Resource> types = new LinkedList<Resource>();
-		Resource classResource = getResource("http://www.w3.org/2002/07/owl#Class");
-		Property labelProperty = getProperty("http://www.w3.org/2000/01/rdf-schema#label");
-		StmtIterator it = model.listStatements(null, RDF.type, classResource);
-		while (it.hasNext()) {
-			Statement stmt = it.next();
-			Resource type = stmt.getSubject();
-			String typeName = formatResourceName(type.getLocalName());
-			if (typeName.equals(name)) {
-				types.add(type);
-				continue;
-			}
-
-			StmtIterator labels = model.listStatements(type, labelProperty, (String)null);
-			while (labels.hasNext()) {
-				Statement labelStmt = labels.next();
-				if (labelStmt.getObject() != null) {
-					Literal label = labelStmt.getObject().asLiteral();
-					if (label.getLanguage() == "en" &&
-						label.getString().toLowerCase().equals(name)) {
-						types.add(type);
-						break;
+	List<ComparablePair<Resource, Float>> getTypeCandidates(Collection<ComparablePair<String, Float>> nameCandidates) {
+		List<ComparablePair<Resource, Float>> types = new LinkedList<>();
+		for (ComparablePair<String, Float> c : nameCandidates) {
+			String name = formatResourceName(c.key);
+			Resource classResource = getResource("http://www.w3.org/2002/07/owl#Class");
+			Property labelProperty = getProperty("http://www.w3.org/2000/01/rdf-schema#label");
+			StmtIterator it = model.listStatements(null, RDF.type, classResource);
+			while (it.hasNext()) {
+				Statement stmt = it.next();
+				Resource type = stmt.getSubject();
+				String typeName = formatResourceName(type.getLocalName());
+				if (typeName.equals(name)) {
+					types.add(new ComparablePair<Resource, Float>(type, c.value));
+					continue;
+				}
+	
+				StmtIterator labels = model.listStatements(type, labelProperty, (String)null);
+				while (labels.hasNext()) {
+					Statement labelStmt = labels.next();
+					if (labelStmt.getObject() != null) {
+						Literal label = labelStmt.getObject().asLiteral();
+						if (label.getLanguage() == "en" &&
+							label.getString().toLowerCase().equals(name)) {
+							types.add(new ComparablePair<Resource, Float>(type, c.value));
+							break;
+						}
 					}
 				}
 			}
 		}
-		System.out.println("type candidates for \"" + name + "\": " + types);
+		Collections.sort(types);
 		return types;
 	}
 	
@@ -269,10 +290,10 @@ public class KnowledgeBaseConnector {
 		List<ComparablePair<Resource, Float>> result = new LinkedList<ComparablePair<Resource, Float>>();
 		{
 			String queryString = "SELECT DISTINCT ?subject ?name WHERE { \n"
-//				               + "  { ?subject foaf:name ?name . ?name <bif:contains> \"'" + name + "'\"} UNION\n"
-//				               + "  { ?subject rdfs:label ?name . ?name <bif:contains> \"'" + name + "'\"} . \n"
+				               + "  { ?subject foaf:name ?name . ?name <bif:contains> \"'" + name + "'\"} UNION\n"
+				               + "  { ?subject rdfs:label ?name . ?name <bif:contains> \"'" + name + "'\"} . \n"
 							   // Important: text:query must come first for pre-filtering (otherwise it takes much longer)
-						       + "  ?subject text:query('" + name + "' " + limit + ") . \n"
+//						       + "  ?subject text:query('" + name + "' " + limit + ") . \n"
 //		                       + "  ?subject a owl:Thing . \n"
 							   + "  { ?subject foaf:name ?name . FILTER(langMatches(lang(?name), \"en\") && contains(?name, \"" + name + "\")) }\n"
                                + "  UNION\n"
@@ -362,34 +383,6 @@ public class KnowledgeBaseConnector {
 		return null;
 	}
 	
-	/**
-	 * Check if a type <code>toCheck</code> is either equal to or (if type is a class) a subclass of <code>type</code>
-	 * 
-	 * @return True if either <code>type</code> or <code>toCheck</code> is null or
-	 * if <code>toCheck</code> is (either directly or transitively) equal to <code>type</code>
-	 */
-	/*
-	boolean checkTypeConstraint(OntResource superType, OntResource subType) {
-		// There is no type constraint
-		if (superType == null) {
-			return true;
-		}
-		// This means range/domain to check for is unknown
-		if (subType == null) {
-			return false;
-		}
-		// Class constraint (e.g. dbpedia-owl:Agent)
-		if (superType.isClass()) {
-			OntClass ontClass = superType.asClass();
-			return ontClass.hasSubClass(subType) || ontClass.equals(subType);
-		// Data range constraint (e.g. xsd:integer)
-		} else if (superType.isDataRange()) {
-			return superType.equals(subType);
-		} else {
-			return true;
-		}
-	}*/
-	
 	String getTypeConstraintSPARQLString(TypeConstraint tc, String varName) {
 		if (tc == null) {
 			return "";
@@ -404,20 +397,50 @@ public class KnowledgeBaseConnector {
 			return res;
 		}
 	}
-	/*
-	String getSPARQLTypeConstraint(OntResource type, String varName) {
-		if (type == null) {
-			return "";
-		} else if (type.isClass()) {
-			return "?" + varName + " a " + getSPARQLResourceString(type) + " . ";
-		} else if (type.isDataRange()) {
-			return "FILTER(DATATYPE(?" + varName + ") = " + getSPARQLResourceString(type) + ") . ";
-		}
-		return "";
-	}*/
 	
-	Collection<ComparablePair<Property, Float>> getPropertyCandidates(Map<String, Float> nameCandidates, Resource subject, Resource object,
+	String getLuceneQueryString(Collection<ComparablePair<String, Float>> nameCandidates) {
+		StringBuilder query = new StringBuilder();
+		query.append("\"");
+		for (ComparablePair<String, Float> p : nameCandidates) {
+			String name = p.key;
+			query.append(name.replaceAll("_", " ").toLowerCase());
+			query.append(" ");
+		}
+		query.append("\"");
+		return query.toString();
+	}
+	
+	/**
+	 * Check if a type <code>toCheck</code> is either equal to or (if type is a class) a subclass of <code>type</code>
+	 * 
+	 * @return True if either <code>type</code> or <code>toCheck</code> is null or
+	 * if <code>toCheck</code> is (either directly or transitively) equal to <code>type</code>
+	 */
+	boolean checkTypeConstraint(OntResource type, OntResource toCheck) {
+		if (type == null || toCheck == null) {
+			return true;
+		}
+		// Class constraint (e.g. dbpedia-owl:Agent)
+		if (type.isClass()) {
+			OntClass ontClass = type.asClass();
+			return ontClass.hasSubClass(toCheck) || ontClass.equals(toCheck);
+			// Data range constraint (e.g. xsd:integer)
+		} else if (type.isDataRange()) {
+			return type.equals(toCheck);
+		} else {
+			return true;
+		}
+	}
+	
+	/**
+	 * nameCandidates must be sorted in ascending order
+	 */
+	Collection<ComparablePair<Property, Float>> getPropertyCandidates(List<ComparablePair<String, Float>> nameCandidates, Resource subject, Resource object,
 			                                                          TypeConstraint subjectTC, TypeConstraint objectTC) {
+		// This doesn't make much sense (we need at least one constraint, otherwise we'll query the entire DB)
+		if (subject == null && object == null && subjectTC == null && objectTC == null) {
+			return new LinkedList<>();
+		}
 		String querySubject = subject == null ? "?s" : getSPARQLResourceString(subject);
 		String queryObject = object == null ? "?o" : getSPARQLResourceString(object);
 		String query = "SELECT ?p ";
@@ -427,10 +450,26 @@ public class KnowledgeBaseConnector {
 			String countVar = subject == null ? "?s" : "?o";
 			query += "(COUNT(" + countVar + ") AS ?count)";
 		}
-		query += " WHERE { " + querySubject + " ?p " + queryObject + " . ";
+		query += " WHERE { ";
+		// We know that the object is a resource, exclude all non-object properties in advance (e.g. DBPedia properties)
+//		if (object != null) {
+//			query += "?p a owl:ObjectProperty . ";
+//		}
+		// This will take too long, append a lucene text search (though this has problems in some cases, e.g. when the prefix is too short)
+//		if (subject == null && object == null) {
+//			int numCandidates = 10;
+//			Collection<ComparablePair<String, Float>> reducedNamedCandidates = nameCandidates.subList(0, Math.min(numCandidates, nameCandidates.size()));
+//			query += "?p text:query " + getLuceneQueryString(reducedNamedCandidates) + " . ";
+//			query += "?p rdfs:label ?l . ?l <bif:contains> " + getLuceneQueryString(reducedNamedCandidates) + " . ";
+//		}
+		query += querySubject + " ?p " + queryObject + " . ";
 		query += getTypeConstraintSPARQLString(subjectTC, "s");
 		query += getTypeConstraintSPARQLString(objectTC, "o");
-		query += "} GROUP BY ?p";
+		query += "}";
+		if (useCountScore) {
+			query += " GROUP BY ?p ORDER BY DESC(?count)";
+		}
+		query += " LIMIT 100";
 		QueryExecution qexec;
 		try {
 			qexec = getQueryExec(query);
@@ -460,6 +499,10 @@ public class KnowledgeBaseConnector {
 			if (p == null) {
 				continue;
 			}
+			// We know that the object is a resource, exclude all non-object properties in advance (e.g. DBPedia properties)
+			if (object != null && !p.isObjectProperty()) {
+				continue;
+			}
 			float propertyTypeScore;
 			// Slightly prefer object properties over non-object properties
 			if (p.isObjectProperty()) {
@@ -469,10 +512,10 @@ public class KnowledgeBaseConnector {
 			}
 			
 			String pName = formatResourceName(p.getLocalName());
-			if (nameCandidates != null) {
-				for (Entry<String, Float> candidate : nameCandidates.entrySet()) {
-					if (pName.startsWith(candidate.getKey())) {
-						float score = (float)candidate.getKey().length() / pName.length() * candidate.getValue() * propertyTypeScore + countScoreBonus;
+			if (nameCandidates != null && !nameCandidates.isEmpty()) {
+				for (ComparablePair<String, Float> candidate : nameCandidates) {
+					if (pName.startsWith(candidate.key)) {
+						float score = (float)candidate.key.length() / pName.length() * candidate.value * propertyTypeScore + countScoreBonus;
 						result.add(new ComparablePair<Property, Float>(p, score));
 					}
 				}
@@ -488,8 +531,8 @@ public class KnowledgeBaseConnector {
 	
 	public void close() {
 		System.out.println("Closing KB Connector. Number of queries: " + numQueries);
-		ontModel.close();
-		model.close();
-		data.end();
+//		ontModel.close();
+//		model.close();
+//		data.end();
 	}
 }

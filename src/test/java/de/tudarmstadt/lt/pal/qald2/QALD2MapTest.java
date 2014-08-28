@@ -55,11 +55,11 @@ public class QALD2MapTest {
 	public void test() throws ParseException {
 		Set<String> answers = new HashSet<String>();
 
-		String query = tripleMapper.buildSPARQLQuery(entry.pseudoQuery);
+		String query = tripleMapper.getBestSPARQLQuery(entry.pseudoQuery);
 		assertTrue(query != null);
 		System.out.println("QUERY: " + query);
 		System.out.println("======= ANSWER =======");
-		String focusVar = entry.pseudoQuery.vars.keySet().iterator().next();
+		String focusVar = entry.pseudoQuery.focusVar.name;
 		try {
 			System.out.println("?" + focusVar + ":");
 			answers.addAll(kb.query(query, focusVar));

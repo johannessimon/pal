@@ -36,9 +36,8 @@ public class StanfordPseudoQueryBuilder {
 	 * Build a pseudo query from the given dependency tree
 	 */
 	public PseudoQuery buildPseudoQuery(SemanticGraph dependencies) {
-		Set<IndexedWord> focusWords = new HashSet<IndexedWord>();
 		// extractTriples() will add focus words to passed focusWords set
-		Set<StanfordTriple> triples = tripleExtactor.extractTriples(dependencies, focusWords);
+		Set<StanfordTriple> triples = tripleExtactor.extractTriples(dependencies);
 		Map<IndexedWord, Variable> variables = new HashMap<IndexedWord, Variable>();
 		List<SPARQLTriple> queryTriples = new LinkedList<SPARQLTriple>();
 		for (StanfordTriple t : triples) {
@@ -48,30 +47,23 @@ public class StanfordPseudoQueryBuilder {
 //			System.out.println("[Subject: " + subject + "] [Predicate: " + predicate + "] [Object: " + object + "]");
 			queryTriples.add(new SPARQLTriple(subject, predicate, object));
 		}
+		Variable focusVariable = variables.get(tripleExtactor.getFocusWord());
 
 		Map<String, Variable> vars = new HashMap<String, Variable>();
 		for (IndexedWord var : variables.keySet()) {
 			Variable sparqlVar = variables.get(var);
-			/*String type = var.lemma();
-			switch (type.toLowerCase()) {
-			case "who":
-				type = "http://dbpedia.org/ontology/Person";
-				break;
-			case "where":
-				type = "http://dbpedia.org/ontology/Place";
-				break;
-			case "when":
-				type = "xsd:date";
-				break;
+			// Improvise if there's no obvious focus variable...
+			// This will work in 90% of the cases, as there's often just one variable :-)
+			if (focusVariable == null) {
+				focusVariable = sparqlVar;
 			}
-			// System.out.println(variables.get(var) + " <type> " + type);
-			sparqlVar.typeName = type;*/
 			vars.put(sparqlVar.name, sparqlVar);
 		}
 		
 		PseudoQuery pseudoQuery = new PseudoQuery();
 		pseudoQuery.triples = queryTriples;
 		pseudoQuery.vars = vars;
+		pseudoQuery.focusVar = focusVariable;
 		return pseudoQuery;
 	}
 	
@@ -104,7 +96,7 @@ public class StanfordPseudoQueryBuilder {
 	Variable registerVariable(Map<IndexedWord, Variable> variables, IndexedWord word, SemanticGraph deps, Variable.Type varType) {
 		Variable var = variables.get(word);
 		if (var == null) {
-			String varName = getNodeText(deps, word).replace(' ', '_');
+			String varName = word.lemma();//getNodeText(deps, word).replace(' ', '_');
 			if (varType == null) {
 				varType = getVariableType(word);
 			}

@@ -1,9 +1,11 @@
 package de.tudarmstadt.lt.pal;
 
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
 import junit.framework.TestCase;
 
@@ -21,19 +23,23 @@ public class KnowledgeBaseConnectorTest extends TestCase {
 	
 	@Test
 	public void testGetPropertyCandidates() {
-		Map<String, Float> nameCandidates = new HashMap<>();
+		List<ComparablePair<String, Float>> nameCandidates = new LinkedList<>();
 		// maps to dbprop:source, but does not match range constraint
-		nameCandidates.put("source", 1.0f);
+		nameCandidates.add(new ComparablePair<>("source", 1.0f));
 		// maps to dbpedia-owl:author, and matches range constraint
-		nameCandidates.put("author", 1.0f);
+		nameCandidates.add(new ComparablePair<>("author", 1.0f));
 		Resource resource = kb.getResource("http://dbpedia.org/resource/Wikipedia");
 		TypeConstraint range = new TypeConstraint(TypeConstraint.BasicType.Resource, "http://dbpedia.org/ontology/Person");
 		Collection<ComparablePair<Property, Float>> propCandidates = kb.getPropertyCandidates(nameCandidates, resource, null, null, range);
 		assertEquals(2, propCandidates.size());
-		ComparablePair<Property, Float> prop1 = new ComparablePair<>(kb.getProperty("http://dbpedia.org/ontology/author"), 1.0f);
-		ComparablePair<Property, Float> prop2 = new ComparablePair<>(kb.getProperty("http://dbpedia.org/property/author"), 1.0f);
-		assertTrue(propCandidates.contains(prop1));
-		assertTrue(propCandidates.contains(prop2));
+		Set<Property> expected = new HashSet<>();
+		expected.add(kb.getProperty("http://dbpedia.org/ontology/author"));
+		expected.add(kb.getProperty("http://dbpedia.org/property/author"));
+		Set<Property> actual = new HashSet<>();
+		Iterator<ComparablePair<Property, Float>> it = propCandidates.iterator();
+		actual.add(it.next().key);
+		actual.add(it.next().key);
+		assertEquals(expected, actual);
 		
 		System.out.println(propCandidates);
 	}

@@ -19,9 +19,9 @@ public class StanfordTripleExtractor {
 	/**
 	 * Builds StanfordTriple's consisting of nodes from a stanford dependency tree (as opposed to SPARQLTriples)
 	 */
-	public Set<StanfordTriple> extractTriples(SemanticGraph deps, Set<IndexedWord> focusWords) {
+	public Set<StanfordTriple> extractTriples(SemanticGraph deps) {
 		this.deps = deps;
-		this.focusWords = focusWords;
+		focusWord = null;
 		triples = new HashSet<>();
 //		varConstraints = new HashMap<>();
 		IndexedWord root = deps.getFirstRoot();
@@ -30,9 +30,11 @@ public class StanfordTripleExtractor {
 	}
 	
 	private SemanticGraph deps;
-	private Set<IndexedWord> focusWords;
+	private IndexedWord focusWord;
 	private Set<StanfordTriple> triples;
 //	private Map<IndexedWord, String> varConstraints;
+	
+	public IndexedWord getFocusWord() { return focusWord; }
 	
 	/**
 	 * Recursively collect triples over dependency graph
@@ -115,17 +117,17 @@ public class StanfordTripleExtractor {
 					predicate = node;
 					subject = child;
 					if (child.value().toLowerCase().equals("who")) {
-						focusWords.add(child);
+						focusWord = child;
 					}
 				}
 			} else if (relName.equals("advmod")) {
 				object = child;
 				if (child.tag().startsWith("W")) {
-					focusWords.add(child);
+					focusWord = child;
 				}
 			} else if (relName.equals("det")) {
 				if (child.value().toLowerCase().equals("which")) {
-					focusWords.add(node);
+					focusWord = node;
 				}
 			}
 		}

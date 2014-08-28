@@ -52,8 +52,7 @@ public class WordNetConnector {
 		}
 	}
 	
-	public Map<String, Float> getSynonyms(String word, String posStr) {
-		Map<String, Float> synonymScores = new HashMap<>();
+	private POS posFromString(String posStr) {
 		POS pos;
 		if (posStr.startsWith("n")) {
 			pos = POS.NOUN;
@@ -64,6 +63,34 @@ public class WordNetConnector {
 		} else if (posStr.startsWith("a")) {
 			pos = POS.ADVERB;
 		} else {
+			pos = null;
+		}
+		return pos;
+	}
+	
+	public Map<String, Float> getSynonyms(String word, String posStr) {
+		Map<String, Float> synonymScores = new HashMap<>();
+		POS pos = posFromString(posStr);
+		if (pos == null) {
+			return new HashMap<>();
+		}
+		IIndexWord idxWord = dict.getIndexWord(word, pos);
+		if (idxWord == null) {
+			return new HashMap<>();
+		}
+		for (IWordID wordID : idxWord.getWordIDs()) {
+			IWord w = dict.getWord(wordID);
+			// Get direct and transitive synonyms
+			addSynonyms(synonymScores, getSynonyms(w, 1, 2, w.getLemma()));
+		}
+		
+		return synonymScores;
+	}
+	
+	public Map<String, Float> getRelatedWords(String word, String posStr) {
+		Map<String, Float> synonymScores = new HashMap<>();
+		POS pos = posFromString(posStr);
+		if (pos == null) {
 			return new HashMap<>();
 		}
 		IIndexWord idxWord = dict.getIndexWord(word, pos);
@@ -120,7 +147,7 @@ public class WordNetConnector {
 	}
 	
 	public Map<String, Float> getHyponyms(ISynset s, int maxDepth) {
-		return getRelatedWords(s, 1, maxDepth, Pointer.HYPONYM, false);
+		return getRelatedWords(s, 1, maxDepth, Pointer.HYPONYM, true);
 	}
 	
 	public Map<String, Float> getRelatedWords(ISynset s, int depth, int maxDepth, IPointer relationType, boolean assignDepthPenalty) {
@@ -149,6 +176,6 @@ public class WordNetConnector {
 	
 	public static void main(String[] args) {
 		WordNetConnector wnc = new WordNetConnector("/usr/local/Cellar/wordnet/3.1/dict/");
-		wnc.getSynonyms("start", "v");
+		wnc.getSynonyms("organization", "n");
 	}
 }
