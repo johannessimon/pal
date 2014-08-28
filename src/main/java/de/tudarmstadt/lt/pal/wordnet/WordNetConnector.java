@@ -3,12 +3,15 @@ package de.tudarmstadt.lt.pal.wordnet;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import de.tudarmstadt.lt.pal.util.ComparablePair;
 import edu.mit.jwi.Dictionary;
 import edu.mit.jwi.IDictionary;
 import edu.mit.jwi.item.IIndexWord;
@@ -68,20 +71,41 @@ public class WordNetConnector {
 		return pos;
 	}
 	
+	/**
+	 * Returns semantically meaningful partial words of the given word, e.g.
+	 * "official web site" -> "official web site", "web site", "site"
+	 */
+	public Collection<ComparablePair<String, Float>> getPartialWords(String word) {
+		List<ComparablePair<String, Float>> res = new LinkedList<>();
+		String[] tokens = word.split(" ");
+		for (int i = tokens.length - 1; i >= 0; i--) {
+			String partialWord = "";
+			for (int j = i; j < tokens.length; j++) {
+				partialWord += " " + tokens[j];
+			}
+			partialWord = partialWord.trim();
+			res.add(new ComparablePair<String, Float>(partialWord, (float)partialWord.length() / word.length()));
+		}
+		return res;
+	}
+	
 	public Map<String, Float> getSynonyms(String word, String posStr) {
 		Map<String, Float> synonymScores = new HashMap<>();
 		POS pos = posFromString(posStr);
 		if (pos == null) {
 			return new HashMap<>();
 		}
-		IIndexWord idxWord = dict.getIndexWord(word, pos);
-		if (idxWord == null) {
-			return new HashMap<>();
-		}
-		for (IWordID wordID : idxWord.getWordIDs()) {
-			IWord w = dict.getWord(wordID);
-			// Get direct and transitive synonyms
-			addSynonyms(synonymScores, getSynonyms(w, 1, 2, w.getLemma()));
+		Collection<ComparablePair<String, Float>> partialWords = getPartialWords(word);
+		for (ComparablePair<String, Float> partialWord : partialWords) {
+			IIndexWord idxWord = dict.getIndexWord(partialWord.key, pos);
+			if (idxWord == null) {
+				continue;
+			}
+			for (IWordID wordID : idxWord.getWordIDs()) {
+				IWord w = dict.getWord(wordID);
+				// Get direct and transitive synonyms
+				addSynonyms(synonymScores, getSynonyms(w, 1, 2, w.getLemma()), partialWord.value);
+			}
 		}
 		
 		return synonymScores;
@@ -93,31 +117,35 @@ public class WordNetConnector {
 		if (pos == null) {
 			return new HashMap<>();
 		}
-		IIndexWord idxWord = dict.getIndexWord(word, pos);
-		if (idxWord == null) {
-			return new HashMap<>();
-		}
-		// Use hypernyms to find related words, but assign a penalty
-		// as hypernyms are a "bad" way to find synonyms
-		// (human is not a synonym of author, but the other way around)
-		float hypernymPenalty = 0.1f;
-		for (IWordID wordID : idxWord.getWordIDs()) {
-			IWord w = dict.getWord(wordID);
-			addSynonyms(synonymScores, getHyponyms(w.getSynset(), 3));
-			addSynonyms(synonymScores, getHypernyms(w.getSynset(), 3), hypernymPenalty);
-			addSynonym(synonymScores, w.getLemma(), 1.0f);
-			// Get direct and transitive synonyms
-			addSynonyms(synonymScores, getSynonyms(w, 1, 2, w.getLemma()));
-			
-			List<IWordID> rWordIDs = w.getRelatedWords(Pointer.DERIVATIONALLY_RELATED);
-			for (IWordID rWordID : rWordIDs) {
-				IWord rW = dict.getWord(rWordID);
-				addSynonym(synonymScores, rW.getLemma(), 1.0f);
-				addSynonyms(synonymScores, getHyponyms(rW.getSynset(), 3));
-				addSynonyms(synonymScores, getHypernyms(rW.getSynset(), 3), hypernymPenalty);
-				
+		Collection<ComparablePair<String, Float>> partialWords = getPartialWords(word);
+		for (ComparablePair<String, Float> partialWord : partialWords) {
+			float factor = partialWord.value;
+			IIndexWord idxWord = dict.getIndexWord(partialWord.key, pos);
+			if (idxWord == null) {
+				continue;
+			}
+			// Use hypernyms to find related words, but assign a penalty
+			// as hypernyms are a "bad" way to find synonyms
+			// (human is not a synonym of author, but the other way around)
+			float hypernymPenalty = 0.1f;
+			for (IWordID wordID : idxWord.getWordIDs()) {
+				IWord w = dict.getWord(wordID);
+				addSynonyms(synonymScores, getHyponyms(w.getSynset(), 3), factor);
+				addSynonyms(synonymScores, getHypernyms(w.getSynset(), 3), factor*hypernymPenalty);
+				addSynonym(synonymScores, w.getLemma(), factor);
 				// Get direct and transitive synonyms
-				addSynonyms(synonymScores, getSynonyms(rW, 1, 2, w.getLemma() + "->" + rW.getLemma()));
+				addSynonyms(synonymScores, getSynonyms(w, 1, 2, w.getLemma()), factor);
+				
+				List<IWordID> rWordIDs = w.getRelatedWords(Pointer.DERIVATIONALLY_RELATED);
+				for (IWordID rWordID : rWordIDs) {
+					IWord rW = dict.getWord(rWordID);
+					addSynonym(synonymScores, rW.getLemma(), factor);
+					addSynonyms(synonymScores, getHyponyms(rW.getSynset(), 3), factor);
+					addSynonyms(synonymScores, getHypernyms(rW.getSynset(), 3), factor*hypernymPenalty);
+					
+					// Get direct and transitive synonyms
+					addSynonyms(synonymScores, getSynonyms(rW, 1, 2, w.getLemma() + "->" + rW.getLemma()));
+				}
 			}
 		}
 		
