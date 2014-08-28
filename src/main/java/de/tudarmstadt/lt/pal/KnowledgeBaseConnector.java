@@ -471,7 +471,7 @@ public class KnowledgeBaseConnector {
 		if (useCountScore) {
 			query += " GROUP BY ?p ORDER BY DESC(?count)";
 		}
-		query += " LIMIT 100";
+		query += " LIMIT 1000";
 		QueryExecution qexec;
 		ResultSet propPreCandidates;
 		try {

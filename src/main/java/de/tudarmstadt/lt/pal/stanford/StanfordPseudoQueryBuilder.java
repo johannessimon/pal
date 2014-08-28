@@ -96,7 +96,8 @@ public class StanfordPseudoQueryBuilder {
 	Variable registerVariable(Map<IndexedWord, Variable> variables, IndexedWord word, SemanticGraph deps, Variable.Type varType) {
 		Variable var = variables.get(word);
 		if (var == null) {
-			String varName = word.lemma();//getNodeText(deps, word).replace(' ', '_');
+//			String varName = word.lemma();
+			String varName = getNodeText(deps, word).replace(' ', '_');
 			if (varType == null) {
 				varType = getVariableType(word);
 			}

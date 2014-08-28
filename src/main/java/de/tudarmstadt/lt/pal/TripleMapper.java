@@ -42,7 +42,7 @@ public class TripleMapper {
 				candidates = Collections.singletonList(new ComparablePair<Resource, Float>(kb.getResource(e.name), 1.0f));
 			} else {
 				// Get scores for 100 resource candidates and choose best N
-				int numCandidates = 100;
+				int numCandidates = 1000;
 				int numCandidatesFiltered = 3;
 				candidates = kb.getResourceCandidates(e.name, numCandidates);
 				if (candidates.size() > numCandidatesFiltered) {
@@ -103,7 +103,8 @@ public class TripleMapper {
 			typeURI = null;
 			break;
 		case Unknown:
-			Map<String, Float> nameCandidates = wnc.getSynonyms(var.name, "n");
+			String varProperty = var.name.replaceAll("_", " ");
+			Map<String, Float> nameCandidates = wnc.getSynonyms(varProperty, "n");
 			Set<ComparablePair<String, Float>> nameCandidateSet = new HashSet<>();
 			nameCandidateSet.add(new ComparablePair<String, Float>(var.name, 1.0f));
 			// This value can be anything < 1.0f so that the original term is preferred

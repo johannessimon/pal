@@ -1,6 +1,5 @@
 package de.tudarmstadt.lt.pal.util;
 
-import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;

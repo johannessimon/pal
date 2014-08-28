@@ -47,6 +47,7 @@ public class WordNetConnector {
 	}
 	
 	public void addSynonym(Map<String, Float> synonymScores, String synonym, float score) {
+		synonym = synonym.replaceAll("_", " ");
 		Float existingScore = synonymScores.get(synonym);
 		// Insert only if no such synonym exists yet or if
 		// we've found a better score for the same synonym
