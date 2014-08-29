@@ -25,10 +25,7 @@ import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
-import com.hp.hpl.jena.rdf.model.Statement;
-import com.hp.hpl.jena.rdf.model.StmtIterator;
 import com.hp.hpl.jena.tdb.TDBFactory;
-import com.hp.hpl.jena.vocabulary.RDF;
 
 import de.tudarmstadt.lt.pal.SPARQLTriple.TypeConstraint;
 import de.tudarmstadt.lt.pal.SPARQLTriple.TypeConstraint.BasicType;
@@ -160,6 +157,7 @@ public class KnowledgeBaseConnector {
 //			System.out.println(it.next());
 //		}
 		fillNamespacePrefixes();
+		retrieveClassesInUse();
 	}
 	/*
 	public KnowledgeBaseConnector(String tdbDir) {
@@ -236,32 +234,43 @@ public class KnowledgeBaseConnector {
 		return formattedName.toString();
 	}
 	
+	Map<Resource, Collection<String>> classesInUse;
+	private void retrieveClassesInUse() {
+		classesInUse = new HashMap<>();
+		// Selects all classes that are actually in use along with their labels
+		String query = "SELECT DISTINCT ?t ?l WHERE { ?t a owl:Class . ?s a ?t . ?t rdfs:label ?l . FILTER(langMatches(lang(?l), \"en\"))}";
+		QueryExecution qexec = getQueryExec(query);
+		ResultSet results = qexec.execSelect();
+		while (results.hasNext()) {
+			QuerySolution sol = results.next();
+			Resource classResource = sol.getResource("?t");
+			String classLabel = sol.getLiteral("?l").toString();
+			Collection<String> labels = classesInUse.get(classResource);
+			if (labels == null) {
+				labels = new LinkedList<String>();
+				classesInUse.put(classResource, labels);
+			}
+			labels.add(classLabel);
+		}
+	}
+	
 	List<ComparablePair<Resource, Float>> getTypeCandidates(Collection<ComparablePair<String, Float>> nameCandidates) {
 		List<ComparablePair<Resource, Float>> types = new LinkedList<>();
 		for (ComparablePair<String, Float> c : nameCandidates) {
 			String name = formatResourceName(c.key);
-			Resource classResource = getResource("http://www.w3.org/2002/07/owl#Class");
-			Property labelProperty = getProperty("http://www.w3.org/2000/01/rdf-schema#label");
-			StmtIterator it = model.listStatements(null, RDF.type, classResource);
-			while (it.hasNext()) {
-				Statement stmt = it.next();
-				Resource type = stmt.getSubject();
+			for (Entry<Resource, Collection<String>> typeEntry : classesInUse.entrySet()) {
+				Resource type = typeEntry.getKey();
+				Collection<String> labels = typeEntry.getValue();
 				String typeName = formatResourceName(type.getLocalName());
 				if (typeName.equals(name)) {
 					types.add(new ComparablePair<Resource, Float>(type, c.value));
 					continue;
 				}
 	
-				StmtIterator labels = model.listStatements(type, labelProperty, (String)null);
-				while (labels.hasNext()) {
-					Statement labelStmt = labels.next();
-					if (labelStmt.getObject() != null) {
-						Literal label = labelStmt.getObject().asLiteral();
-						if (label.getLanguage() == "en" &&
-							label.getString().toLowerCase().equals(name)) {
-							types.add(new ComparablePair<Resource, Float>(type, c.value));
-							break;
-						}
+				for (String label : labels) {
+					if (label.toLowerCase().equals(name)) {
+						types.add(new ComparablePair<Resource, Float>(type, c.value));
+						break;
 					}
 				}
 			}
