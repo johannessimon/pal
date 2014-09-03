@@ -9,23 +9,19 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import com.hp.hpl.jena.ontology.OntClass;
+import com.hp.hpl.jena.ontology.OntDocumentManager;
 import com.hp.hpl.jena.ontology.OntModel;
 import com.hp.hpl.jena.ontology.OntModelSpec;
 import com.hp.hpl.jena.ontology.OntProperty;
 import com.hp.hpl.jena.ontology.OntResource;
-import com.hp.hpl.jena.query.Dataset;
 import com.hp.hpl.jena.query.QueryExecution;
 import com.hp.hpl.jena.query.QueryExecutionFactory;
 import com.hp.hpl.jena.query.QuerySolution;
-import com.hp.hpl.jena.query.ReadWrite;
 import com.hp.hpl.jena.query.ResultSet;
 import com.hp.hpl.jena.rdf.model.Literal;
-import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
-import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
-import com.hp.hpl.jena.tdb.TDBFactory;
 
 import de.tudarmstadt.lt.pal.SPARQLTriple.TypeConstraint;
 import de.tudarmstadt.lt.pal.SPARQLTriple.TypeConstraint.BasicType;
@@ -36,10 +32,10 @@ import de.tudarmstadt.lt.pal.util.ComparablePair;
  */
 public class KnowledgeBaseConnector {
 	
-	Model model;
+//	Model model;
 	OntModel ontModel;
 //	InfModel infModel;
-	Dataset data;
+//	Dataset data;
 	String sparqlEndpoint;
 	
 	/**
@@ -47,35 +43,17 @@ public class KnowledgeBaseConnector {
 	 * known namespace prefixes. Uses <code>?varName</code> instead
 	 * if resource is null
 	 */
-	public String getSPARQLResourceString(Resource r) {
-		String prefix = namespacePrefixes.get(r.getNameSpace());
-		if (prefix != null) {
-			return prefix + ":" + r.getLocalName();
-		}
-	
-		return "<" + r.getURI() + ">";
-	}
-	public Resource getResourceFromSPARQLResourceString(String sparqlString) {
-		String uri = sparqlString;
-		for (Entry<String, String> prefix : namespacePrefixes.entrySet()) {
-			if (sparqlString.startsWith(prefix.getValue())) {
-				uri = prefix.getKey() + sparqlString.substring(prefix.getValue().length());
-				break;
+	public String getSPARQLResourceString(String uri) {
+		for (Entry<String, String> namespacePrefix : namespacePrefixes.entrySet()) {
+			String ns = namespacePrefix.getKey();
+			String prefix = namespacePrefix.getValue();
+			if (uri.startsWith(ns)) {
+				String localName = uri.substring(ns.length());
+				return prefix + ":" + localName;
 			}
 		}
-		return getResource(uri);
-	}
 	
-	/**
-	 * Returns a short representation of the resource's URI using
-	 * known namespace prefixes.
-	 */
-	public String getSPARQLResourceString(String uri) {
-		// Attempt to shorten URI using known prefixes
-		if (uri.startsWith("http://")) {
-			return getSPARQLResourceString(getResource(uri));
-		}
-		return uri;
+		return "<" + uri + ">";
 	}
 	
 	/**
@@ -141,15 +119,24 @@ public class KnowledgeBaseConnector {
 	
 	public KnowledgeBaseConnector() {
 //		sparqlEndpoint = "http://localhost:3030/ds/query";
-		sparqlEndpoint = "http://localhost:8001/sparql/"; // nginx cache
-//		sparqlEndpoint = "http://localhost:8890/sparql/"; // virtuoso
-		data = TDBFactory.createDataset("/Users/jsimon/No-Backup/dbpedia37/tdb");
+//		sparqlEndpoint = "http://localhost:8001/sparql/"; // nginx cache
+		sparqlEndpoint = "http://localhost:8890/sparql/"; // virtuoso
+//		data = TDBFactory.createDataset("/Users/jsimon/No-Backup/dbpedia37/tdb");
 //		data = DatasetFactory.assemble(
 //			    "/Users/jsimon/No-Backup/dbpedia37/dbpedia37-fuseki.ttl", 
 //			    "http://localhost/dbpedia37#text_dataset") ;
-		data.begin(ReadWrite.READ);
-		model = data.getDefaultModel();
-		ontModel = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM, model);
+//		data.begin(ReadWrite.READ);
+//		model = data.getDefaultModel();
+//		ontModel = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM, model);
+		ontModel = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM);
+//		ontModel.setDynamicImports(true);
+//		ontModel.loadImports();
+		
+		OntDocumentManager dm = ontModel.getDocumentManager();
+		dm.addAltEntry("http://dbpedia.org/ontology/", "file:///Volumes/Bill/No-Backup/dbpedia37/download/dbpedia_3.7.owl");
+		dm.addAltEntry("http://xmlns.com/foaf/0.1/", "file:///Volumes/Bill/No-Backup/dbpedia37/download/foaf.rdf");
+		ontModel.read("http://dbpedia.org/ontology/");
+		ontModel.read("http://xmlns.com/foaf/0.1/");
 		
 //		ontModel.prepare();
 //		Iterator<OntClass> it = ontModel.listClasses();
@@ -183,19 +170,12 @@ public class KnowledgeBaseConnector {
 		query = getNamespacePrefixDeclarations() + "\n" + query;
 		System.out.println(query.replaceAll("\n", " "));
 		QueryExecution qexec;
-		if (sparqlEndpoint != null) {
+//		if (sparqlEndpoint != null) {
 			qexec = QueryExecutionFactory.sparqlService(sparqlEndpoint, query);
-		} else {
-			qexec = QueryExecutionFactory.create(query, model);
-		}
+//		} else {
+//			qexec = QueryExecutionFactory.create(query, model);
+//		}
 		return qexec;
-	}
-	
-	/**
-	 * Returns the property with the specified URI
-	 */
-	Property getProperty(String uri) {
-		return model.getProperty(uri);
 	}
 	
 	/**
@@ -203,13 +183,6 @@ public class KnowledgeBaseConnector {
 	 */
 	OntProperty getOntProperty(String uri) {
 		return ontModel.getOntProperty(uri);
-	}
-
-	/**
-	 * Returns the resource with the specified URI
-	 */
-	Resource getResource(String uri) {
-		return model.getResource(uri);
 	}
 	
 	/**
@@ -290,13 +263,13 @@ public class KnowledgeBaseConnector {
 		return uri;
 	}
 	
-	List<ComparablePair<Resource, Float>> getResourceCandidates(String name, int limit) {
+	List<ComparablePair<String, Float>> getResourceCandidates(String name, int limit) {
 		System.out.println("Searching resources... [" + name + "]");
 		if (name.contains("#")) {
 			int sepIndex = name.indexOf('#');
 			name = name.substring(0, sepIndex);
 		}
-		List<ComparablePair<Resource, Float>> result = new LinkedList<ComparablePair<Resource, Float>>();
+		List<ComparablePair<String, Float>> result = new LinkedList<>();
 		{
 			String queryString = "SELECT DISTINCT ?subject ?name WHERE { \n"
 				               + "  { ?subject foaf:name ?name . ?name <bif:contains> \"'" + name + "'\"} UNION\n"
@@ -328,7 +301,7 @@ public class KnowledgeBaseConnector {
 						if (comboScore < 1.0f) {
 							comboScore = comboScore * inexactMatchPenalty;
 						}
-						result.add(new ComparablePair<Resource, Float>(r, comboScore));
+						result.add(new ComparablePair<String, Float>(r.getURI(), comboScore));
 					}
 				}
 			} catch (Exception e) {
@@ -446,19 +419,19 @@ public class KnowledgeBaseConnector {
 	/**
 	 * nameCandidates must be sorted in ascending order
 	 */
-	Collection<ComparablePair<Property, Float>> getPropertyCandidates(List<ComparablePair<String, Float>> nameCandidates, Resource subject, Resource object,
+	Collection<ComparablePair<String, Float>> getPropertyCandidates(List<ComparablePair<String, Float>> nameCandidates, String subjectURI, String objectURI,
 			                                                          TypeConstraint subjectTC, TypeConstraint objectTC) {
 		// This doesn't make much sense (we need at least one constraint, otherwise we'll query the entire DB)
-		if (subject == null && object == null && subjectTC == null && objectTC == null) {
+		if (subjectURI == null && objectURI == null && subjectTC == null && objectTC == null) {
 			return new LinkedList<>();
 		}
-		String querySubject = subject == null ? "?s" : getSPARQLResourceString(subject);
-		String queryObject = object == null ? "?o" : getSPARQLResourceString(object);
+		String querySubject = subjectURI == null ? "?s" : getSPARQLResourceString(subjectURI);
+		String queryObject = objectURI == null ? "?o" : getSPARQLResourceString(objectURI);
 		String query = "SELECT ?p ";
 		// Count number of property "connections" if we have no clue about the property
 		boolean useCountScore = true;//nameCandidates == null;// && subjectIsVar ^ objectIsVar;
 		if (useCountScore) {
-			String countVar = subject == null ? "?s" : "?o";
+			String countVar = subjectURI == null ? "?s" : "?o";
 			query += "(COUNT(" + countVar + ") AS ?count)";
 		}
 		query += " WHERE { ";
@@ -491,7 +464,7 @@ public class KnowledgeBaseConnector {
 			return new LinkedList<>();
 		}
 				
-		List<ComparablePair<Property, Float>> result = new LinkedList<ComparablePair<Property, Float>>();
+		List<ComparablePair<String, Float>> result = new LinkedList<>();
 		while (propPreCandidates.hasNext()) {
 			QuerySolution sol = propPreCandidates.next();
 			Resource pRes = sol.getResource("p");
@@ -499,6 +472,7 @@ public class KnowledgeBaseConnector {
 			if (pRes == null) {
 				break;
 			}
+			String pUri = pRes.getURI();
 			// Assign a very small bonus for higher number of connections
 			// -> should only make a difference for near-tie situations
 			float countScoreBonus = 0.0f;
@@ -507,32 +481,29 @@ public class KnowledgeBaseConnector {
 				// to be scored as high as a typed property with 10 items
 				countScoreBonus = 0.00001f * (float)Math.log(1 + sol.getLiteral("count").getInt());
 			}
-			OntProperty p = ontModel.getOntProperty(pRes.getURI());
-			if (p == null) {
-				continue;
-			}
+			OntProperty p = ontModel.getOntProperty(pUri);
 			// We know that the object is a resource, exclude all non-object properties in advance (e.g. DBPedia properties)
-			if (object != null && !p.isObjectProperty()) {
+			if (objectURI != null && (p == null || !p.isObjectProperty())) {
 				continue;
 			}
 			float propertyTypeScore;
 			// Slightly prefer object properties over non-object properties
-			if (p.isObjectProperty()) {
+			if (p != null && p.isObjectProperty()) {
 				propertyTypeScore = 1.01f;
 			} else {
 				propertyTypeScore = 1.00f;
 			}
 			
-			String pName = formatResourceName(p.getLocalName());
+			String pName = formatResourceName(pRes.getLocalName());
 			if (nameCandidates != null && !nameCandidates.isEmpty()) {
 				for (ComparablePair<String, Float> candidate : nameCandidates) {
 					if (pName.startsWith(candidate.key)) {
 						float score = (float)candidate.key.length() / pName.length() * candidate.value * propertyTypeScore + countScoreBonus;
-						result.add(new ComparablePair<Property, Float>(p, score));
+						result.add(new ComparablePair<String, Float>(pUri, score));
 					}
 				}
 			} else {
-				result.add(new ComparablePair<Property, Float>(p, countScoreBonus));
+				result.add(new ComparablePair<String, Float>(pUri, countScoreBonus));
 			}
 		}
 		Collections.sort(result);

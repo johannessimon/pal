@@ -38,7 +38,7 @@ public class QALD2Test {
 	TripleMapper tripleMapper = new TripleMapper(kb);
 	StanfordCoreNLP pipeline;
 	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
-	StanfordDependencyParser depParser = new StanfordDependencyParser("/Users/jsimon/No-Backup/stanford-parser-tmp");
+	StanfordDependencyParser depParser = new StanfordDependencyParser("/Volumes/Bill/No-Backup/stanford-parser-tmp");
 	
 	public QALD2Test(String question, QALD2Entry entry) {
 		this.entry = entry;
@@ -48,7 +48,7 @@ public class QALD2Test {
 	public static Collection<Object> initialize() throws ParserConfigurationException, SAXException, IOException {
 		List<Object> params = new LinkedList<Object>();
 		Collection<QALD2Entry> entries = QALD2XMLParser.parse(
-				"/Users/jsimon/Documents/Uni/Watson-Projekt/dbpedia-train-answers.xml",
+				"/Volumes/Bill/Documents/Uni/Watson-Projekt/dbpedia-train-answers.xml",
 				null);
 
 		for (QALD2Entry entry : entries) {

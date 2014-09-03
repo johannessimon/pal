@@ -10,7 +10,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import com.hp.hpl.jena.ontology.OntResource;
-import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.Resource;
 
 import de.tudarmstadt.lt.pal.SPARQLTriple.Constant;
@@ -27,19 +26,19 @@ import de.tudarmstadt.lt.pal.wordnet.WordNetConnector;
  */
 public class TripleMapper {
 	KnowledgeBaseConnector kb;
-	WordNetConnector wnc = new WordNetConnector("/Users/jsimon/No-Backup/wordnet31/dict");
+	WordNetConnector wnc = new WordNetConnector("/Volumes/Bill/No-Backup/wordnet31/dict");
 	
 	public TripleMapper(KnowledgeBaseConnector kb) {
 		this.kb = kb;
 	}
 	
-	private Collection<ComparablePair<Resource, Float>> mapResource(Element e) {
-		List<ComparablePair<Resource, Float>> candidates = null;
+	private Collection<ComparablePair<String, Float>> mapResource(Element e) {
+		List<ComparablePair<String, Float>> candidates = null;
 		
 		if (e instanceof Constant) {
 			Constant c = (Constant)e;
 			if (c.type == Constant.Type.Mapped) {
-				candidates = Collections.singletonList(new ComparablePair<Resource, Float>(kb.getResource(e.name), 1.0f));
+				candidates = Collections.singletonList(new ComparablePair<String, Float>(e.name, 1.0f));
 			} else {
 				// Get scores for 100 resource candidates and choose best N
 				int numCandidates = 1000;
@@ -53,13 +52,13 @@ public class TripleMapper {
 		return candidates;
 	}
 	
-	private Collection<ComparablePair<Property, Float>> mapProperty(Element p, Resource subject, Resource object, TypeConstraint subjectTC, TypeConstraint objectTC) {
+	private Collection<ComparablePair<String, Float>> mapProperty(Element p, String subjectURI, String objectURI, TypeConstraint subjectTC, TypeConstraint objectTC) {
 		Map<String, Float> synonyms = new HashMap<>();
 		
 		if (p instanceof Constant) {
 			Constant c = (Constant)p;
 			if (c.type == Constant.Type.Mapped) {
-				return Collections.singleton(new ComparablePair<Property, Float>(kb.getProperty(p.name), 1.0f));
+				return Collections.singleton(new ComparablePair<String, Float>(p.name, 1.0f));
 			} else {
 				String nameLC = p.name.toLowerCase();
 				String pos = null;
@@ -79,7 +78,7 @@ public class TripleMapper {
 		}
 		Collections.sort(nameCandidates);
 		
-		return kb.getPropertyCandidates(nameCandidates, subject, object, subjectTC, objectTC);
+		return kb.getPropertyCandidates(nameCandidates, subjectURI, objectURI, subjectTC, objectTC);
 	}
 	
 	private TypeConstraint mapVariableType(Variable var) {
@@ -217,20 +216,20 @@ public class TripleMapper {
 	List<ComparablePair<String, Float>> buildSPARQLTriple(SPARQLTriple triple, Map<Variable, TypeConstraint> varTypeConstraints) {
 		List<ComparablePair<String, Float>> res = new LinkedList<>();
 
-		Collection<ComparablePair<Resource, Float>> subjectCandidates = mapResource(triple.subject);
-		Collection<ComparablePair<Resource, Float>> objectCandidates = mapResource(triple.object);
+		Collection<ComparablePair<String, Float>> subjectCandidates = mapResource(triple.subject);
+		Collection<ComparablePair<String, Float>> objectCandidates = mapResource(triple.object);
 		
 		String tripleQuery = null;
 		if (subjectCandidates != null) {
-			for (ComparablePair<Resource, Float> scoredSubject : subjectCandidates) {
-				Resource subject = scoredSubject.key;
+			for (ComparablePair<String, Float> scoredSubject : subjectCandidates) {
+				String subject = scoredSubject.key;
 				// Only returns type constraint != null if object is a variable and has been assigned a type constraint
 				TypeConstraint objectTC = varTypeConstraints.get(triple.object);
 
-				Collection<ComparablePair<Property, Float>> propCandidates = mapProperty(triple.predicate, subject, null, null, objectTC);
+				Collection<ComparablePair<String, Float>> propCandidates = mapProperty(triple.predicate, subject, null, null, objectTC);
 				System.out.println("prop candidates: " + propCandidates);
-				for (ComparablePair<Property, Float> scoredProp : propCandidates) {
-					Property prop = scoredProp.key;
+				for (ComparablePair<String, Float> scoredProp : propCandidates) {
+					String prop = scoredProp.key;
 					float comboScore = scoredSubject.value * scoredProp.value;
 					tripleQuery = kb.getSPARQLResourceString(subject) + " "
 							    + kb.getSPARQLResourceString(prop) + " "
@@ -239,15 +238,15 @@ public class TripleMapper {
 				}
 			}
 		} else if (objectCandidates != null) {
-			for (ComparablePair<Resource, Float> scoredObject : objectCandidates) {
-				Resource object = scoredObject.key;
+			for (ComparablePair<String, Float> scoredObject : objectCandidates) {
+				String object = scoredObject.key;
 				// Only returns type constraint != null if object is a variable and has been assigned a type constraint
 				TypeConstraint subjectTC = varTypeConstraints.get(triple.subject);
 						
-				Collection<ComparablePair<Property, Float>> propCandidates = mapProperty(triple.predicate, null, object, subjectTC, null);
+				Collection<ComparablePair<String, Float>> propCandidates = mapProperty(triple.predicate, null, object, subjectTC, null);
 				System.out.println("prop candidates: " + propCandidates);
-				for (ComparablePair<Property, Float> scoredProp : propCandidates) {
-					Property prop = scoredProp.key;
+				for (ComparablePair<String, Float> scoredProp : propCandidates) {
+					String prop = scoredProp.key;
 					float comboScore = scoredObject.value * scoredProp.value;
 					tripleQuery = triple.subject + " "
 								+ kb.getSPARQLResourceString(prop) + " "
@@ -260,10 +259,10 @@ public class TripleMapper {
 			TypeConstraint subjectTC = varTypeConstraints.get(triple.subject);
 			TypeConstraint objectTC = varTypeConstraints.get(triple.object);
 					
-			Collection<ComparablePair<Property, Float>> propCandidates = mapProperty(triple.predicate, null, null, subjectTC, objectTC);
+			Collection<ComparablePair<String, Float>> propCandidates = mapProperty(triple.predicate, null, null, subjectTC, objectTC);
 			System.out.println("prop candidates: " + propCandidates);
-			for (ComparablePair<Property, Float> scoredProp : propCandidates) {
-				Property prop = scoredProp.key;
+			for (ComparablePair<String, Float> scoredProp : propCandidates) {
+				String prop = scoredProp.key;
 				tripleQuery = triple.subject + " "
 					    	+ kb.getSPARQLResourceString(prop) + " "
 					    	+ triple.object + " . ";

@@ -11,8 +11,7 @@ import junit.framework.TestCase;
 
 import org.junit.Test;
 
-import com.hp.hpl.jena.rdf.model.Property;
-import com.hp.hpl.jena.rdf.model.Resource;
+import com.hp.hpl.jena.ontology.OntProperty;
 
 import de.tudarmstadt.lt.pal.SPARQLTriple.TypeConstraint;
 import de.tudarmstadt.lt.pal.util.ComparablePair;
@@ -28,15 +27,15 @@ public class KnowledgeBaseConnectorTest extends TestCase {
 		nameCandidates.add(new ComparablePair<>("source", 1.0f));
 		// maps to dbpedia-owl:author, and matches range constraint
 		nameCandidates.add(new ComparablePair<>("author", 1.0f));
-		Resource resource = kb.getResource("http://dbpedia.org/resource/Wikipedia");
+		String resource = "http://dbpedia.org/resource/Wikipedia";
 		TypeConstraint range = new TypeConstraint(TypeConstraint.BasicType.Resource, "http://dbpedia.org/ontology/Person");
-		Collection<ComparablePair<Property, Float>> propCandidates = kb.getPropertyCandidates(nameCandidates, resource, null, null, range);
+		Collection<ComparablePair<String, Float>> propCandidates = kb.getPropertyCandidates(nameCandidates, resource, null, null, range);
 		assertEquals(2, propCandidates.size());
-		Set<Property> expected = new HashSet<>();
-		expected.add(kb.getProperty("http://dbpedia.org/ontology/author"));
-		expected.add(kb.getProperty("http://dbpedia.org/property/author"));
-		Set<Property> actual = new HashSet<>();
-		Iterator<ComparablePair<Property, Float>> it = propCandidates.iterator();
+		Set<String> expected = new HashSet<>();
+		expected.add("http://dbpedia.org/ontology/author");
+		expected.add("http://dbpedia.org/property/author");
+		Set<String> actual = new HashSet<>();
+		Iterator<ComparablePair<String, Float>> it = propCandidates.iterator();
 		actual.add(it.next().key);
 		actual.add(it.next().key);
 		assertEquals(expected, actual);
@@ -45,10 +44,16 @@ public class KnowledgeBaseConnectorTest extends TestCase {
 	}
 
 	@Test
+	public void testGetOntProperty() {
+		OntProperty p = kb.getOntProperty("http://dbpedia.org/ontology/author");
+		assertTrue(p != null);
+	}
+
+	@Test
 	public void testGetResourceCandidates() {
-		List<ComparablePair<Resource, Float>> candidates = kb.getResourceCandidates("Dan Brown", 10);
+		List<ComparablePair<String, Float>> candidates = kb.getResourceCandidates("Dan Brown", 10);
 		System.out.println(candidates);
-		ComparablePair<Property, Float> r1 = new ComparablePair<>(kb.getProperty("http://dbpedia.org/resource/Dan_Brown"), 1.0f);
+		ComparablePair<String, Float> r1 = new ComparablePair<>("http://dbpedia.org/resource/Dan_Brown", 1.0f);
 		assertTrue(candidates.contains(r1));
 	}
 	
