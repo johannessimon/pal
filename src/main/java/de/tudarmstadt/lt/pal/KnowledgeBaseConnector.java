@@ -52,8 +52,12 @@ public class KnowledgeBaseConnector {
 				return prefix + ":" + localName;
 			}
 		}
-	
-		return "<" + uri + ">";
+		
+		if (uri.startsWith("http://")) {
+			return "<" + uri + ">";
+		} else {
+			return uri;
+		}
 	}
 	
 	/**

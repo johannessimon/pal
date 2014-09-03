@@ -42,7 +42,7 @@ public class WordNetConnector {
 	
 	public void addSynonyms(Map<String, Float> synonyms, Map<String, Float> toAdd, float factor) {
 		for (Entry<String, Float> s : toAdd.entrySet()) {
-			addSynonym(synonyms, s.getKey(), s.getValue());
+			addSynonym(synonyms, s.getKey(), s.getValue()*factor);
 		}
 	}
 	
@@ -150,7 +150,6 @@ public class WordNetConnector {
 			}
 		}
 		
-//		System.out.println(synonyms);
 		return synonymScores;
 	}
 	
@@ -204,7 +203,7 @@ public class WordNetConnector {
 	}
 	
 	public static void main(String[] args) {
-		WordNetConnector wnc = new WordNetConnector("/usr/local/Cellar/wordnet/3.1/dict/");
-		wnc.getSynonyms("organization", "n");
+		WordNetConnector wnc = new WordNetConnector("/Volumes/Bill/No-Backup/wordnet31/dict");
+		wnc.getSynonyms("die", "v");
 	}
 }

@@ -30,6 +30,7 @@ public class StanfordPseudoQueryBuilder {
 		ignoredWords.add("many");
 		ignoredWords.add("much");
 		ignoredWords.add("how");
+		ignoredWords.add("where");
 	}
 	
 	/**
