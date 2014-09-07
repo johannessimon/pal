@@ -54,17 +54,12 @@ public class DateUtil {
 	    return null; // Unknown format.
 	}
 	
-	public static Date parseDate(String dateString) {
+	public static Date parseDate(String dateString) throws ParseException {
 		String dateFormat = determineDateFormat(dateString);
 		if (dateFormat == null) {
 			return null;
 		}
 		SimpleDateFormat df = new SimpleDateFormat(dateFormat);
-		try {
-			return df.parse(dateString);
-		} catch (ParseException e) {
-			e.printStackTrace();
-		}
-		return null;
+		return df.parse(dateString);
 	}
 }

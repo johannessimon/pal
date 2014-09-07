@@ -62,9 +62,9 @@ public class Triple implements Cloneable {
 			Literal
 		}
 		public BasicType basicType;
-		public String typeURI;
+		public MappedString typeURI;
 		
-		public TypeConstraint(BasicType basicType, String typeURI) {
+		public TypeConstraint(BasicType basicType, MappedString typeURI) {
 			this.basicType = basicType;
 			this.typeURI = typeURI;
 		}

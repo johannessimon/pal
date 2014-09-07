@@ -82,26 +82,31 @@ public class QALD2Test {
 		if (answers.iterator().hasNext()) {
 			firstAnswer = answers.iterator().next();
 		}
-		switch (entry.answerType) {
-		case Resource:
-			assertEquals(entry.answerResources, answers);
-			break;
-		case String:
-			assertEquals(entry.answerString, firstAnswer);
-			break;
-		case Boolean:
-			fail(); // Not implemented yet
-			assertTrue(firstAnswer != null);
-			assertEquals(entry.answerBoolean, Boolean.parseBoolean(firstAnswer));
-			break;
-		case Date:
-			assertTrue(firstAnswer != null);
-			assertEquals(entry.answerDate, DateUtil.parseDate(firstAnswer));
-			break;
-		case Number:
-			assertTrue(firstAnswer != null);
-			assertEquals(entry.answerNumber, NumberFormat.getInstance(Locale.US).parse(firstAnswer));
-			break;
+		try {
+			switch (entry.answerType) {
+			case Resource:
+				assertEquals(entry.answerResources, answers);
+				break;
+			case String:
+				assertEquals(entry.answerString, firstAnswer);
+				break;
+			case Boolean:
+				fail(); // Not implemented yet
+				assertTrue(firstAnswer != null);
+				assertEquals(entry.answerBoolean, Boolean.parseBoolean(firstAnswer));
+				break;
+			case Date:
+				assertTrue(firstAnswer != null);
+				assertEquals(entry.answerDate, DateUtil.parseDate(firstAnswer));
+				break;
+			case Number:
+				assertTrue(firstAnswer != null);
+				assertEquals(entry.answerNumber, NumberFormat.getInstance(Locale.US).parse(firstAnswer));
+				break;
+			}
+		} catch (Exception e) {
+			// This is a parse error on the JUnit side, we don't want this to show up as "error"
+			fail();
 		}
 	}
 	

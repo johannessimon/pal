@@ -77,10 +77,10 @@ public class StanfordTripleExtractor {
 			GrammaticalRelation rel = edge.getRelation();
 			String relName = edge.getRelation().getShortName();
 			// "be" as verb is a special case, as predicate is usually "hidden" in adjective
-			if (node.lemma().equals("be")) {
-				if (relName.contains("subj") || relName.contains("obj")) {
+			if (node.lemma().equals("be") || node.lemma().equals("have")) {
+				if (relName.contains("subj")) {
 					subject = child;
-				} else {
+				} else if (relName.contains("obj") || relName.contains("dep") || relName.contains("prep")) {
 					predicate = child;
 					object = child;
 				}
@@ -89,7 +89,7 @@ public class StanfordTripleExtractor {
 				object = child;
 			// Special case preposition (reversion of subject/object,
 		    // parent is predicate)
-			} else if (relName.equals("prep") &
+			} else if (relName.equals("prep") &&
 					   rel.getSpecific() != null && rel.getSpecific().equals("of")) {
 				// The name of the relation (e.g. "state of" or "height of" at the same
 				// time hints at the type of the object (height -> number)
@@ -99,16 +99,14 @@ public class StanfordTripleExtractor {
 				predicate = node;
 				subject = child;
 			} else if (relName.equals("prep")) {
-				// If the object modifies a verb, then the
-				// verb is part of the relation (predicate)
-				if (node.tag().startsWith("V")) {
-					// TODO: "born in" -> take "bear" as predicate and interprate "in" as dbpedia-owl:Place for target
-					predicate = node;
-				} else {
+				if (node.tag().startsWith("N")) {
 					// In this case we don't know anything about the predicate and will use
 					// a wildcard (thus constraint = "there must be a relation between subject/object")
 					predicate = null;
 					subject = node;
+				} else {
+					// TODO: "born in" -> take "bear" as predicate and interprate "in" as dbpedia-owl:Place for target
+					predicate = node;
 				}
 				object = child;
 			} else if (relName.equals("nsubj") || relName.equals("nsubjpass")) {

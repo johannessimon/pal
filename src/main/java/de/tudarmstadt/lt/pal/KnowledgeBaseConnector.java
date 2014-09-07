@@ -24,9 +24,10 @@ import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
 
 import de.tudarmstadt.lt.pal.Triple.TypeConstraint;
-import de.tudarmstadt.lt.pal.Triple.Variable;
 import de.tudarmstadt.lt.pal.Triple.TypeConstraint.BasicType;
+import de.tudarmstadt.lt.pal.Triple.Variable;
 import de.tudarmstadt.lt.pal.util.ComparablePair;
+import de.tudarmstadt.lt.pal.util.StringUtil;
 
 /**
  * Basic interface to ontology and triple store
@@ -232,22 +233,28 @@ public class KnowledgeBaseConnector {
 		}
 	}
 	
-	List<ComparablePair<Resource, Float>> getTypeCandidates(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
-		List<ComparablePair<Resource, Float>> types = new LinkedList<>();
+	List<ComparablePair<MappedString, Float>> getTypeCandidates(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
+		List<ComparablePair<MappedString, Float>> types = new LinkedList<>();
 		for (ComparablePair<MappedString, Float> c : nameCandidates) {
-			String name = formatResourceName(c.key.word);
+			String name = formatResourceName(c.key.value);
 			for (Entry<Resource, Collection<String>> typeEntry : classesInUse.entrySet()) {
 				Resource type = typeEntry.getKey();
 				Collection<String> labels = typeEntry.getValue();
 				String typeName = formatResourceName(type.getLocalName());
 				if (typeName.equals(name)) {
-					types.add(new ComparablePair<Resource, Float>(type, c.value));
+					List<String> trace = new LinkedList<>(c.key.trace);
+					trace.add(getSPARQLResourceString(type.getURI()) + " (URI match)");
+					MappedString mappedType = new MappedString(type.getURI(), trace);
+					types.add(new ComparablePair<>(mappedType, c.value));
 					continue;
 				}
 	
 				for (String label : labels) {
 					if (label.toLowerCase().equals(name)) {
-						types.add(new ComparablePair<Resource, Float>(type, c.value));
+						List<String> trace = new LinkedList<>(c.key.trace);
+						trace.add(getSPARQLResourceString(type.getURI()) + " (label match)");
+						MappedString mappedType = new MappedString(type.getURI(), trace);
+						types.add(new ComparablePair<>(mappedType, c.value));
 						break;
 					}
 				}
@@ -345,13 +352,13 @@ public class KnowledgeBaseConnector {
 			}
 		}
 		for (Triple t : q.triples) {
+			queryStr += "   ";
 			queryStr += t.subject.sparqlString() + " ";
 			queryStr += t.predicate.sparqlString() + " ";
-			queryStr += t.object.sparqlString() + ".\n";
+			queryStr += t.object.sparqlString() + " .\n";
 		}
 
-		final int RESULT_LIMIT = 1000;
-		queryStr += "} LIMIT " + RESULT_LIMIT;
+		queryStr += "}";
 		return queryStr;
 	}
 	
@@ -365,6 +372,12 @@ public class KnowledgeBaseConnector {
 		// Invalid query check
 		if (queryString == null || queryString.contains("<null>")) {
 			return res;
+		}
+		
+
+		final int RESULT_LIMIT = 1000;
+		if (!queryString.contains("LIMIT")) {
+			queryString += " LIMIT" + RESULT_LIMIT;
 		}
 		
 		QueryExecution qexec = getQueryExec(queryString);
@@ -397,7 +410,7 @@ public class KnowledgeBaseConnector {
 	 * Returns either an <code>OntClass</code> or a <code>DataRange</code> representation of the
 	 * given resource or null if no such representation exists.
 	 */
-	OntResource getOntResource(Resource r) {
+	OntResource getOntResource(String r) {
 		if (r != null) {
 			OntResource ontR = ontModel.getOntResource(r);
 			if (ontR.isClass() || ontR.isDataRange()) {
@@ -411,11 +424,11 @@ public class KnowledgeBaseConnector {
 		if (tc == null) {
 			return "";
 		} else if (tc.basicType == BasicType.Resource) {
-			return "?" + varName + " a " + getSPARQLResourceString(tc.typeURI) + " . \n";
+			return "   ?" + varName + " a " + getSPARQLResourceString(tc.typeURI.value) + " . \n";
 		} else/* if (tc.basicType == BasicType.Literal)*/ {
-			String res = "FILTER(ISLITERAL(?" + varName + ")";
+			String res = "   FILTER(ISLITERAL(?" + varName + ")";
 			if (tc.typeURI != null) {
-				res += " && DATATYPE(?" + varName + ") = " + getSPARQLResourceString(tc.typeURI);
+				res += " && DATATYPE(?" + varName + ") = " + getSPARQLResourceString(tc.typeURI.value);
 			}
 			res += ") . \n";
 			return res;
@@ -538,8 +551,8 @@ public class KnowledgeBaseConnector {
 			String pName = formatResourceName(pRes.getLocalName());
 			if (nameCandidates != null && !nameCandidates.isEmpty()) {
 				for (ComparablePair<MappedString, Float> candidate : nameCandidates) {
-					String candidateWord = candidate.key.word;
-					if (pName.startsWith(candidateWord)) {
+					String candidateWord = candidate.key.value;
+					if (StringUtil.hasPartStartingWith(pName, candidateWord)) {
 						float score = (float)candidateWord.length() / pName.length() * candidate.value * propertyTypeScore + countScoreBonus;
 						MappedString mappedPUri = new MappedString(pUriShortForm, candidate.key.trace);
 						mappedPUri.trace.add(pUriShortForm + " (URI match)");

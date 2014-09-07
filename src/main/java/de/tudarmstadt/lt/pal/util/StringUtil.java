@@ -2,39 +2,13 @@ package de.tudarmstadt.lt.pal.util;
 
 public class StringUtil {
 	/**
-	 * Returns the longest common substring of two strings.<br/>
-	 * Taken from http://en.wikibooks.org/wiki/Algorithm_Implementation/Strings/Longest_common_substring#Java
+	 * Tests if <code>haystack</code> has word parts starting with <code>needle</code>
 	 */
-	public static int longestSubstr(String first, String second) {
-	    if (first == null || second == null || first.length() == 0 || second.length() == 0) {
-	        return 0;
-	    }
-	 
-	    int maxLen = 0;
-	    int fl = first.length();
-	    int sl = second.length();
-	    int[][] table = new int[fl+1][sl+1];
-	 
-	    for(int s=0; s <= sl; s++)
-	      table[0][s] = 0;
-	    for(int f=0; f <= fl; f++)
-	      table[f][0] = 0;
-	 
-	    for (int i = 1; i <= fl; i++) {
-	        for (int j = 1; j <= sl; j++) {
-	            if (first.charAt(i-1) == second.charAt(j-1)) {
-	                if (i == 1 || j == 1) {
-	                    table[i][j] = 1;
-	                }
-	                else {
-	                    table[i][j] = table[i - 1][j - 1] + 1;
-	                }
-	                if (table[i][j] > maxLen) {
-	                    maxLen = table[i][j];
-	                }
-	            }
-	        }
-	    }
-	    return maxLen;
+	public static boolean hasPartStartingWith(String haystack, String needle) {
+		// ("abc def", "abc") -> match
+		// ("abc def", "def") -> match
+		// ("abc def", "bc") -> no match
+		// ("abc def", "ef") -> no match
+		return (" " + haystack).contains(" " + needle);
 	}
 }

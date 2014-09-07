@@ -28,7 +28,7 @@ public class KnowledgeBaseConnectorTest extends TestCase {
 		// maps to dbpedia-owl:author, and matches range constraint
 		nameCandidates.add(new ComparablePair<>(new MappedString("author"), 1.0f));
 		String resource = "http://dbpedia.org/resource/Wikipedia";
-		TypeConstraint range = new TypeConstraint(TypeConstraint.BasicType.Resource, "http://dbpedia.org/ontology/Person");
+		TypeConstraint range = new TypeConstraint(TypeConstraint.BasicType.Resource, new MappedString("http://dbpedia.org/ontology/Person"));
 		Collection<ComparablePair<MappedString, Float>> propCandidates = kb.getPropertyCandidates(nameCandidates, resource, null, null, range);
 		assertEquals(2, propCandidates.size());
 		Set<String> expected = new HashSet<>();
@@ -36,8 +36,8 @@ public class KnowledgeBaseConnectorTest extends TestCase {
 		expected.add("http://dbpedia.org/property/author");
 		Set<String> actual = new HashSet<>();
 		Iterator<ComparablePair<MappedString, Float>> it = propCandidates.iterator();
-		actual.add(it.next().key.word);
-		actual.add(it.next().key.word);
+		actual.add(it.next().key.value);
+		actual.add(it.next().key.value);
 		assertEquals(expected, actual);
 		
 		System.out.println(propCandidates);

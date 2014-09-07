@@ -4,29 +4,29 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class MappedString {
-	public String word;
+	public String value;
 	public List<String> trace = new LinkedList<>();
 	
 	public MappedString(String word) {
-		this.word = word;
+		this.value = word;
 		trace.add(word);
 	}
 	
 	public MappedString(String word, List<String> trace) {
-		this.word = word;
+		this.value = word;
 		this.trace.addAll(trace);
 	}
 
 	@Override
 	public String toString() {
-		return word;
+		return value;
 	}
 
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + ((word == null) ? 0 : word.hashCode());
+		result = prime * result + ((value == null) ? 0 : value.hashCode());
 		return result;
 	}
 
@@ -39,10 +39,10 @@ public class MappedString {
 		if (getClass() != obj.getClass())
 			return false;
 		MappedString other = (MappedString) obj;
-		if (word == null) {
-			if (other.word != null)
+		if (value == null) {
+			if (other.value != null)
 				return false;
-		} else if (!word.equals(other.word))
+		} else if (!value.equals(other.value))
 			return false;
 		return true;
 	}

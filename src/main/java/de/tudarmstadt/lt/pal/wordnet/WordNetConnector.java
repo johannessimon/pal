@@ -56,7 +56,7 @@ public class WordNetConnector {
 	}
 	
 	public void addSynonym(Map<MappedString, Float> synonymScores, MappedString synonym, float score) {
-		synonym.word = synonym.word.replaceAll("_", " ");
+		synonym.value = synonym.value.replaceAll("_", " ");
 		Float existingScore = synonymScores.get(synonym);
 		// Insert only if no such synonym exists yet or if
 		// we've found a better score for the same synonym
@@ -111,7 +111,8 @@ public class WordNetConnector {
 			if (idxWord == null) {
 				continue;
 			}
-			List<String> trace = Arrays.asList(word);
+			List<String> trace = new LinkedList<>();
+			trace.add(word);
 			if (!partialWord.key.equals(word)) {
 				trace.add(idxWord.getLemma() + " (partial word)");
 			}

@@ -10,7 +10,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import com.hp.hpl.jena.ontology.OntResource;
-import com.hp.hpl.jena.rdf.model.Resource;
 
 import de.tudarmstadt.lt.pal.Triple.Constant;
 import de.tudarmstadt.lt.pal.Triple.Element;
@@ -85,19 +84,24 @@ public class QueryMapper {
 	
 	private TypeConstraint mapVariableType(Variable var) {
 		TypeConstraint.BasicType basicType = null;
-		String typeURI = null;
+		MappedString typeURI = null;
+		List<String> derivedTypeTrace = new LinkedList<>();
+		derivedTypeTrace.add(var.name);
 		switch (var.unmappedType) {
 		case Agent:
 			basicType = TypeConstraint.BasicType.Resource;
-			typeURI = "dbpedia-owl:Person";
+			derivedTypeTrace.add("dbpedia-owl:Person (\"who\")");
+			typeURI = new MappedString("dbpedia-owl:Person", derivedTypeTrace);
 			break;
 		case Place:
 			basicType = TypeConstraint.BasicType.Resource;
-			typeURI = "dbpedia-owl:Place";
+			derivedTypeTrace.add("dbpedia-owl:Place (\"where\")");
+			typeURI = new MappedString("dbpedia-owl:Place", derivedTypeTrace);
 			break;
 		case Date:
 			basicType = TypeConstraint.BasicType.Literal;
-			typeURI = "xsd:date";
+			derivedTypeTrace.add("xsd:date (\"when\")");
+			typeURI = new MappedString("xsd:date", derivedTypeTrace);
 			break;
 		case Literal:
 			basicType = TypeConstraint.BasicType.Literal;
@@ -113,16 +117,16 @@ public class QueryMapper {
 			for (Entry<MappedString, Float> entry : nameCandidates.entrySet()) {
 				nameCandidateSet.add(new ComparablePair<MappedString, Float>(entry.getKey(), entry.getValue() * synonymPenalty));
 			}
-			List<ComparablePair<Resource, Float>> typeCandidates = kb.getTypeCandidates(nameCandidateSet);
+			List<ComparablePair<MappedString, Float>> typeCandidates = kb.getTypeCandidates(nameCandidateSet);
 			if (typeCandidates != null && !typeCandidates.isEmpty()) {
-				Resource r = typeCandidates.iterator().next().key;
-				OntResource or = kb.getOntResource(r);
+				MappedString r = typeCandidates.iterator().next().key;
+				OntResource or = kb.getOntResource(r.value);
 				if (or != null && or.isClass()) {
 					basicType = TypeConstraint.BasicType.Resource;
 				} else if (or != null && or.isDataRange()) {
 					basicType = TypeConstraint.BasicType.Literal;
 				}
-				typeURI = or.getURI();
+				typeURI = r;
 			}
 		}
 		if (basicType != null) {
@@ -208,18 +212,18 @@ public class QueryMapper {
 		Variable subjectVar = (triple.subject instanceof Variable) ? (Variable)triple.subject : null;
 		Variable objectVar = (triple.object instanceof Variable) ? (Variable)triple.object : null;
 		
-		if (subjectCandidates != null) {
+		if (subjectCandidates != null && objectVar != null) {
 			for (ComparablePair<MappedString, Float> scoredSubject : subjectCandidates) {
 				MappedString subject = scoredSubject.key;
 				// Only returns type constraint != null if object is a variable and has been assigned a type constraint
 
-				Collection<ComparablePair<MappedString, Float>> propCandidates = mapProperty(triple.predicate, subject.word, null, null, objectVar.mappedType);
+				Collection<ComparablePair<MappedString, Float>> propCandidates = mapProperty(triple.predicate, subject.value, null, null, objectVar.mappedType);
 				System.out.println("prop candidates: " + propCandidates);
 				for (ComparablePair<MappedString, Float> scoredProp : propCandidates) {
-					String prop = scoredProp.key.word;
+					String prop = scoredProp.key.value;
 					float comboScore = scoredSubject.value * scoredProp.value;
 					
-					Constant subjectElement = new Constant(subject.word, Constant.Type.Mapped);
+					Constant subjectElement = new Constant(subject.value, Constant.Type.Mapped);
 					subjectElement.trace = subject.trace;
 					Constant predicateElement = new Constant(prop, Constant.Type.Mapped);
 					predicateElement.trace = scoredProp.key.trace;
@@ -227,30 +231,30 @@ public class QueryMapper {
 					res.add(new ComparablePair<Triple, Float>(mappedTriple, comboScore));
 				}
 			}
-		} else if (objectCandidates != null) {
+		} else if (objectCandidates != null && subjectVar != null) {
 			for (ComparablePair<MappedString, Float> scoredObject : objectCandidates) {
 				MappedString object = scoredObject.key;
 
-				Collection<ComparablePair<MappedString, Float>> propCandidates = mapProperty(triple.predicate, null, object.word, subjectVar.mappedType, null);
+				Collection<ComparablePair<MappedString, Float>> propCandidates = mapProperty(triple.predicate, null, object.value, subjectVar.mappedType, null);
 				System.out.println("prop candidates: " + propCandidates);
 				for (ComparablePair<MappedString, Float> scoredProp : propCandidates) {
-					String prop = scoredProp.key.word;
+					String prop = scoredProp.key.value;
 					float comboScore = scoredObject.value * scoredProp.value;
 					
 					Constant predicateElement = new Constant(prop, Constant.Type.Mapped);
 					predicateElement.trace = scoredProp.key.trace;
-					Constant objectElement = new Constant(object.word, Constant.Type.Mapped);
+					Constant objectElement = new Constant(object.value, Constant.Type.Mapped);
 					objectElement.trace = object.trace;
 					Triple mappedTriple = new Triple(subjectVar, predicateElement, objectElement);
 					res.add(new ComparablePair<Triple, Float>(mappedTriple, comboScore));
 				}
 			}
 		// Relations between two variables
-		} else if (triple.predicate != null) {
+		} else if (subjectVar != null && objectVar != null && triple.predicate != null) {
 			Collection<ComparablePair<MappedString, Float>> propCandidates = mapProperty(triple.predicate, null, null, subjectVar.mappedType, objectVar.mappedType);
 			System.out.println("prop candidates: " + propCandidates);
 			for (ComparablePair<MappedString, Float> scoredProp : propCandidates) {
-				String prop = scoredProp.key.word;
+				String prop = scoredProp.key.value;
 				Constant predicateElement = new Constant(prop, Constant.Type.Mapped);
 				predicateElement.trace = scoredProp.key.trace;
 				Triple mappedTriple = new Triple(subjectVar, predicateElement, objectVar);
