@@ -299,6 +299,7 @@ public class KnowledgeBaseConnector {
 					if (r != null) {
 						String shortUri = getSPARQLResourceString(r.getURI());
 						List<String> trace = new LinkedList<>();
+						trace.add(name);
 						float labelScore = (float)name.length() / rName.length();
 						String rNameFromURI = getResourceName(r.getURI());
 						float resourceNameScore = 1.0f - (float)Math.abs(rNameFromURI.length() - name.length()) / rNameFromURI.length();
@@ -336,7 +337,7 @@ public class KnowledgeBaseConnector {
 		return query(queryStr, query.focusVar.name);
 	}
 	
-	String queryToSPARQL(Query q) {
+	public String queryToSPARQL(Query q) {
 		String queryStr = "SELECT DISTINCT ?" + q.focusVar.name + " WHERE {\n";
 		for (Variable var : q.vars.values()) {
 			if (var.mappedType != null) {

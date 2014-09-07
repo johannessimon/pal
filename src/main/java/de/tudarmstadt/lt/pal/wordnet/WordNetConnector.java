@@ -3,6 +3,7 @@ package de.tudarmstadt.lt.pal.wordnet;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -110,8 +111,10 @@ public class WordNetConnector {
 			if (idxWord == null) {
 				continue;
 			}
-			List<String> trace = new LinkedList<>();
-			trace.add(idxWord.getLemma() + " (partial word)");
+			List<String> trace = Arrays.asList(word);
+			if (!partialWord.key.equals(word)) {
+				trace.add(idxWord.getLemma() + " (partial word)");
+			}
 			for (IWordID wordID : idxWord.getWordIDs()) {
 				IWord w = dict.getWord(wordID);
 				// Get direct and transitive synonyms
@@ -128,6 +131,7 @@ public class WordNetConnector {
 		if (pos == null) {
 			return new HashMap<>();
 		}
+		List<String> trace = Arrays.asList(word);
 		Collection<ComparablePair<String, Float>> partialWords = getPartialWords(word);
 		for (ComparablePair<String, Float> partialWord : partialWords) {
 			float factor = partialWord.value;
@@ -141,25 +145,28 @@ public class WordNetConnector {
 			float hypernymPenalty = 0.1f;
 			for (IWordID wordID : idxWord.getWordIDs()) {
 				IWord w = dict.getWord(wordID);
-				List<String> trace = new LinkedList<>();
-				trace.add(w.getLemma() + " (partial word)");
-				addSynonyms(synonymScores, getHyponyms(w.getSynset(), 3, trace), factor);
-				addSynonyms(synonymScores, getHypernyms(w.getSynset(), 3, trace), factor*hypernymPenalty);
-				addSynonym(synonymScores, w.getLemma(), trace, factor);
+				List<String> _trace = new LinkedList<>(trace);
+				// only add "partial node" notice if it actually is only a part
+				if (!w.getLemma().equals(word)) {
+					_trace.add(w.getLemma() + " (partial word)");
+				}
+				addSynonyms(synonymScores, getHyponyms(w.getSynset(), 3, _trace), factor);
+				addSynonyms(synonymScores, getHypernyms(w.getSynset(), 3, _trace), factor*hypernymPenalty);
+				addSynonym(synonymScores, w.getLemma(), _trace, factor);
 				// Get direct and transitive synonyms
-				addSynonyms(synonymScores, getSynonyms(w, 1, 2, trace), factor);
+				addSynonyms(synonymScores, getSynonyms(w, 1, 2, _trace), factor);
 				
 				List<IWordID> rWordIDs = w.getRelatedWords(Pointer.DERIVATIONALLY_RELATED);
 				for (IWordID rWordID : rWordIDs) {
 					IWord rW = dict.getWord(rWordID);
-					List<String> _trace = new LinkedList<>(trace);
-					trace.add(rW.getLemma() + " (related form)");
-					addSynonym(synonymScores, rW.getLemma(), _trace, factor);
-					addSynonyms(synonymScores, getHyponyms(rW.getSynset(), 3, _trace), factor);
-					addSynonyms(synonymScores, getHypernyms(rW.getSynset(), 3, _trace), factor*hypernymPenalty);
+					List<String> __trace = new LinkedList<>(_trace);
+					__trace.add(rW.getLemma() + " (related form)");
+					addSynonym(synonymScores, rW.getLemma(), __trace, factor);
+					addSynonyms(synonymScores, getHyponyms(rW.getSynset(), 3, __trace), factor);
+					addSynonyms(synonymScores, getHypernyms(rW.getSynset(), 3, __trace), factor*hypernymPenalty);
 					
 					// Get direct and transitive synonyms
-					addSynonyms(synonymScores, getSynonyms(rW, 1, 2, _trace));
+					addSynonyms(synonymScores, getSynonyms(rW, 1, 2, __trace));
 				}
 			}
 		}
@@ -178,7 +185,10 @@ public class WordNetConnector {
 			for (IWord synonym : s.getWords()) {
 				float score = 1.0f - (float)depth / (maxDepth + 1);
 				List<String> _trace = new LinkedList<>(trace);
-				_trace.add(synonym.getLemma() + " (synonym)");
+				// we don't have to mention that a word is a synonym of itself
+				if (!word.getLemma().equals(synonym.getLemma())) {
+					_trace.add(synonym.getLemma() + " (synonym)");
+				}
 				addSynonym(res, synonym.getLemma(), _trace, score);
 				addSynonyms(res, getSynonyms(synonym, depth + 1, maxDepth, _trace));
 			}

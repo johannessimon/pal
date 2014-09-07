@@ -32,7 +32,7 @@ import de.tudarmstadt.lt.pal.util.ParallelParameterized;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 
-@RunWith(Parameterized.class)
+@RunWith(ParallelParameterized.class)
 public class QALD2Test {
 	QALD2Entry entry;
 	KnowledgeBaseConnector kb = new KnowledgeBaseConnector(/*"/Users/jsimon/No-Backup/dbpedia/data", null*/);

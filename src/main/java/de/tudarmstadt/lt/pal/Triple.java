@@ -1,5 +1,6 @@
 package de.tudarmstadt.lt.pal;
 
+import java.util.Arrays;
 import java.util.List;
 
 
@@ -60,8 +61,8 @@ public class Triple implements Cloneable {
 			Resource,
 			Literal
 		}
-		BasicType basicType;
-		String typeURI;
+		public BasicType basicType;
+		public String typeURI;
 		
 		public TypeConstraint(BasicType basicType, String typeURI) {
 			this.basicType = basicType;
@@ -136,12 +137,14 @@ public class Triple implements Cloneable {
 			Unknown
 		}
 		
-		Type unmappedType;
-		TypeConstraint mappedType;
+		public Type unmappedType;
+		public TypeConstraint mappedType;
 		
 		public Variable(String name, Type unmappedType) {
 			this.name = name;
 			this.unmappedType = unmappedType;
+			// A variable name does not have a real derivation trace
+			this.trace = Arrays.asList(name);
 		}
 		/*
 		private Variable(String name, TypeConstraint mappedType) {

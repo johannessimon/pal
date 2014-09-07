@@ -222,7 +222,7 @@ public class QueryMapper {
 					Constant subjectElement = new Constant(subject.word, Constant.Type.Mapped);
 					subjectElement.trace = subject.trace;
 					Constant predicateElement = new Constant(prop, Constant.Type.Mapped);
-					subjectElement.trace = scoredProp.key.trace;
+					predicateElement.trace = scoredProp.key.trace;
 					Triple mappedTriple = new Triple(subjectElement, predicateElement, objectVar);
 					res.add(new ComparablePair<Triple, Float>(mappedTriple, comboScore));
 				}
