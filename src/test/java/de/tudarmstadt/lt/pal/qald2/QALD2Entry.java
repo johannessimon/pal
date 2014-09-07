@@ -3,7 +3,7 @@ package de.tudarmstadt.lt.pal.qald2;
 import java.util.Date;
 import java.util.Set;
 
-import de.tudarmstadt.lt.pal.PseudoQuery;
+import de.tudarmstadt.lt.pal.Query;
 
 /**
  * An instance of this class represents a question (with type, answer, etc.) in the QALD-2 challenge
@@ -24,7 +24,7 @@ public class QALD2Entry {
 	String question;
 	Set<String> keywords;
 	String query;
-	PseudoQuery pseudoQuery;
+	Query pseudoQuery;
 	
 	Set<String>	answerResources;
 	String		answerString;

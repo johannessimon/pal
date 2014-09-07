@@ -23,8 +23,8 @@ import org.junit.runners.Parameterized;
 import org.xml.sax.SAXException;
 
 import de.tudarmstadt.lt.pal.KnowledgeBaseConnector;
-import de.tudarmstadt.lt.pal.PseudoQuery;
-import de.tudarmstadt.lt.pal.TripleMapper;
+import de.tudarmstadt.lt.pal.Query;
+import de.tudarmstadt.lt.pal.QueryMapper;
 import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
 import de.tudarmstadt.lt.pal.stanford.StanfordPseudoQueryBuilder;
 import de.tudarmstadt.lt.pal.util.DateUtil;
@@ -32,11 +32,11 @@ import de.tudarmstadt.lt.pal.util.ParallelParameterized;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 
-@RunWith(ParallelParameterized.class)
+@RunWith(Parameterized.class)
 public class QALD2Test {
 	QALD2Entry entry;
 	KnowledgeBaseConnector kb = new KnowledgeBaseConnector(/*"/Users/jsimon/No-Backup/dbpedia/data", null*/);
-	TripleMapper tripleMapper = new TripleMapper(kb);
+	QueryMapper tripleMapper = new QueryMapper(kb);
 	StanfordCoreNLP pipeline;
 	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
 	StanfordDependencyParser depParser = new StanfordDependencyParser("/Volumes/Bill/No-Backup/stanford-parser-tmp");
@@ -64,16 +64,16 @@ public class QALD2Test {
 		Set<String> answers = new HashSet<String>();
 		StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
 		SemanticGraph dependencies = depParser.parse(entry.question);
-		PseudoQuery pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
+		Query pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
 
-		String query = tripleMapper.getBestSPARQLQuery(pseudoQuery);
+		Query query = tripleMapper.getBestSPARQLQuery(pseudoQuery);
 		assertTrue(query != null);
 		System.out.println("QUERY: " + query);
 		System.out.println("======= ANSWER =======");
 		String focusVar = pseudoQuery.focusVar.name;
 		try {
 			System.out.println("?" + focusVar + ":");
-			answers.addAll(kb.query(query, focusVar));
+			answers.addAll(kb.query(query));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

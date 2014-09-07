@@ -7,11 +7,11 @@ import java.util.Map;
 import java.util.Set;
 
 import de.tudarmstadt.lt.pal.KnowledgeBaseConnector;
-import de.tudarmstadt.lt.pal.PseudoQuery;
-import de.tudarmstadt.lt.pal.SPARQLTriple;
-import de.tudarmstadt.lt.pal.SPARQLTriple.Constant;
-import de.tudarmstadt.lt.pal.SPARQLTriple.Element;
-import de.tudarmstadt.lt.pal.SPARQLTriple.Variable;
+import de.tudarmstadt.lt.pal.Query;
+import de.tudarmstadt.lt.pal.Triple;
+import de.tudarmstadt.lt.pal.Triple.Constant;
+import de.tudarmstadt.lt.pal.Triple.Element;
+import de.tudarmstadt.lt.pal.Triple.Variable;
 import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
@@ -36,17 +36,17 @@ public class StanfordPseudoQueryBuilder {
 	/**
 	 * Build a pseudo query from the given dependency tree
 	 */
-	public PseudoQuery buildPseudoQuery(SemanticGraph dependencies) {
+	public Query buildPseudoQuery(SemanticGraph dependencies) {
 		// extractTriples() will add focus words to passed focusWords set
 		Set<StanfordTriple> triples = tripleExtactor.extractTriples(dependencies);
 		Map<IndexedWord, Variable> variables = new HashMap<IndexedWord, Variable>();
-		List<SPARQLTriple> queryTriples = new LinkedList<SPARQLTriple>();
+		List<Triple> queryTriples = new LinkedList<Triple>();
 		for (StanfordTriple t : triples) {
 			Element subject = nodeToSPARQLElement(dependencies, t.subject, variables, false);
 			Element predicate = nodeToSPARQLElement(dependencies, t.predicate, variables, true);
 			Element object = nodeToSPARQLElement(dependencies, t.object, variables, false);
 //			System.out.println("[Subject: " + subject + "] [Predicate: " + predicate + "] [Object: " + object + "]");
-			queryTriples.add(new SPARQLTriple(subject, predicate, object));
+			queryTriples.add(new Triple(subject, predicate, object));
 		}
 		Variable focusVariable = variables.get(tripleExtactor.getFocusWord());
 
@@ -61,7 +61,7 @@ public class StanfordPseudoQueryBuilder {
 			vars.put(sparqlVar.name, sparqlVar);
 		}
 		
-		PseudoQuery pseudoQuery = new PseudoQuery();
+		Query pseudoQuery = new Query();
 		pseudoQuery.triples = queryTriples;
 		pseudoQuery.vars = vars;
 		pseudoQuery.focusVar = focusVariable;

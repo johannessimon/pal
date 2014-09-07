@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import de.tudarmstadt.lt.pal.MappedString;
 import de.tudarmstadt.lt.pal.util.ComparablePair;
 import edu.mit.jwi.Dictionary;
 import edu.mit.jwi.IDictionary;
@@ -25,6 +26,7 @@ import edu.mit.jwi.item.Pointer;
 
 public class WordNetConnector {
 	IDictionary dict;
+	
 	public WordNetConnector(String dir) {
 		try {
 			dict = new Dictionary(new File(dir));
@@ -36,18 +38,24 @@ public class WordNetConnector {
 		}
 	}
 	
-	public void addSynonyms(Map<String, Float> synonyms, Map<String, Float> toAdd) {
+	public void addSynonyms(Map<MappedString, Float> synonyms, Map<MappedString, Float> toAdd) {
 		addSynonyms(synonyms, toAdd, 1.0f);
 	}
 	
-	public void addSynonyms(Map<String, Float> synonyms, Map<String, Float> toAdd, float factor) {
-		for (Entry<String, Float> s : toAdd.entrySet()) {
+	public void addSynonyms(Map<MappedString, Float> synonyms, Map<MappedString, Float> toAdd, float factor) {
+		for (Entry<MappedString, Float> s : toAdd.entrySet()) {
 			addSynonym(synonyms, s.getKey(), s.getValue()*factor);
 		}
 	}
 	
-	public void addSynonym(Map<String, Float> synonymScores, String synonym, float score) {
-		synonym = synonym.replaceAll("_", " ");
+
+	public void addSynonym(Map<MappedString, Float> synonymScores, String synonym, List<String> trace, float score) {
+		MappedString mappedWord = new MappedString(synonym, trace);
+		addSynonym(synonymScores, mappedWord, score);
+	}
+	
+	public void addSynonym(Map<MappedString, Float> synonymScores, MappedString synonym, float score) {
+		synonym.word = synonym.word.replaceAll("_", " ");
 		Float existingScore = synonymScores.get(synonym);
 		// Insert only if no such synonym exists yet or if
 		// we've found a better score for the same synonym
@@ -90,8 +98,8 @@ public class WordNetConnector {
 		return res;
 	}
 	
-	public Map<String, Float> getSynonyms(String word, String posStr) {
-		Map<String, Float> synonymScores = new HashMap<>();
+	public Map<MappedString, Float> getSynonyms(String word, String posStr) {
+		Map<MappedString, Float> synonymScores = new HashMap<>();
 		POS pos = posFromString(posStr);
 		if (pos == null) {
 			return new HashMap<>();
@@ -102,18 +110,20 @@ public class WordNetConnector {
 			if (idxWord == null) {
 				continue;
 			}
+			List<String> trace = new LinkedList<>();
+			trace.add(idxWord.getLemma() + " (partial word)");
 			for (IWordID wordID : idxWord.getWordIDs()) {
 				IWord w = dict.getWord(wordID);
 				// Get direct and transitive synonyms
-				addSynonyms(synonymScores, getSynonyms(w, 1, 2, w.getLemma()), partialWord.value);
+				addSynonyms(synonymScores, getSynonyms(w, 1, 2, trace), partialWord.value);
 			}
 		}
 		
 		return synonymScores;
 	}
 	
-	public Map<String, Float> getRelatedWords(String word, String posStr) {
-		Map<String, Float> synonymScores = new HashMap<>();
+	public Map<MappedString, Float> getRelatedWords(String word, String posStr) {
+		Map<MappedString, Float> synonymScores = new HashMap<>();
 		POS pos = posFromString(posStr);
 		if (pos == null) {
 			return new HashMap<>();
@@ -131,21 +141,25 @@ public class WordNetConnector {
 			float hypernymPenalty = 0.1f;
 			for (IWordID wordID : idxWord.getWordIDs()) {
 				IWord w = dict.getWord(wordID);
-				addSynonyms(synonymScores, getHyponyms(w.getSynset(), 3), factor);
-				addSynonyms(synonymScores, getHypernyms(w.getSynset(), 3), factor*hypernymPenalty);
-				addSynonym(synonymScores, w.getLemma(), factor);
+				List<String> trace = new LinkedList<>();
+				trace.add(w.getLemma() + " (partial word)");
+				addSynonyms(synonymScores, getHyponyms(w.getSynset(), 3, trace), factor);
+				addSynonyms(synonymScores, getHypernyms(w.getSynset(), 3, trace), factor*hypernymPenalty);
+				addSynonym(synonymScores, w.getLemma(), trace, factor);
 				// Get direct and transitive synonyms
-				addSynonyms(synonymScores, getSynonyms(w, 1, 2, w.getLemma()), factor);
+				addSynonyms(synonymScores, getSynonyms(w, 1, 2, trace), factor);
 				
 				List<IWordID> rWordIDs = w.getRelatedWords(Pointer.DERIVATIONALLY_RELATED);
 				for (IWordID rWordID : rWordIDs) {
 					IWord rW = dict.getWord(rWordID);
-					addSynonym(synonymScores, rW.getLemma(), factor);
-					addSynonyms(synonymScores, getHyponyms(rW.getSynset(), 3), factor);
-					addSynonyms(synonymScores, getHypernyms(rW.getSynset(), 3), factor*hypernymPenalty);
+					List<String> _trace = new LinkedList<>(trace);
+					trace.add(rW.getLemma() + " (related form)");
+					addSynonym(synonymScores, rW.getLemma(), _trace, factor);
+					addSynonyms(synonymScores, getHyponyms(rW.getSynset(), 3, _trace), factor);
+					addSynonyms(synonymScores, getHypernyms(rW.getSynset(), 3, _trace), factor*hypernymPenalty);
 					
 					// Get direct and transitive synonyms
-					addSynonyms(synonymScores, getSynonyms(rW, 1, 2, w.getLemma() + "->" + rW.getLemma()));
+					addSynonyms(synonymScores, getSynonyms(rW, 1, 2, _trace));
 				}
 			}
 		}
@@ -153,8 +167,8 @@ public class WordNetConnector {
 		return synonymScores;
 	}
 	
-	public Map<String, Float> getSynonyms(IWord word, int depth, int maxDepth, String source) {
-		Map<String, Float> res = new HashMap<>();
+	public Map<MappedString, Float> getSynonyms(IWord word, int depth, int maxDepth, List<String> trace) {
+		Map<MappedString, Float> res = new HashMap<>();
 		if (depth > maxDepth) {
 			return res;
 		}
@@ -163,22 +177,24 @@ public class WordNetConnector {
 			ISynset s = dict.getWord(sameWordInOtherSynset).getSynset();
 			for (IWord synonym : s.getWords()) {
 				float score = 1.0f - (float)depth / (maxDepth + 1);
-				addSynonym(res, /*source + "/" + */synonym.getLemma(), score);
-				addSynonyms(res, getSynonyms(synonym, depth + 1, maxDepth, source + "/" + synonym.getLemma()));
+				List<String> _trace = new LinkedList<>(trace);
+				_trace.add(synonym.getLemma() + " (synonym)");
+				addSynonym(res, synonym.getLemma(), _trace, score);
+				addSynonyms(res, getSynonyms(synonym, depth + 1, maxDepth, _trace));
 			}
 		}
 		return res;
 	}
 	
-	public Map<String, Float> getHypernyms(ISynset s, int maxDepth) {
-		return getRelatedWords(s, 1, maxDepth, Pointer.HYPERNYM, true);
+	public Map<MappedString, Float> getHypernyms(ISynset s, int maxDepth, List<String> trace) {
+		return getRelatedWords(s, 1, maxDepth, Pointer.HYPERNYM, true, trace);
 	}
 	
-	public Map<String, Float> getHyponyms(ISynset s, int maxDepth) {
-		return getRelatedWords(s, 1, maxDepth, Pointer.HYPONYM, true);
+	public Map<MappedString, Float> getHyponyms(ISynset s, int maxDepth, List<String> trace) {
+		return getRelatedWords(s, 1, maxDepth, Pointer.HYPONYM, true, trace);
 	}
 	
-	public Map<String, Float> getRelatedWords(ISynset s, int depth, int maxDepth, IPointer relationType, boolean assignDepthPenalty) {
+	public Map<MappedString, Float> getRelatedWords(ISynset s, int depth, int maxDepth, IPointer relationType, boolean assignDepthPenalty, List<String> trace) {
 		if (depth == maxDepth) {
 			return Collections.emptyMap();
 		}
@@ -186,18 +202,23 @@ public class WordNetConnector {
 		if (assignDepthPenalty) {
 			scoreInThisDepth -= (float)depth / maxDepth;
 		}
-		Map<String, Float> res = new HashMap<>();
+		Map<MappedString, Float> res = new HashMap<>();
 //		Map foo = word.getRelatedMap();
 		List<ISynsetID> sIDs = s.getRelatedSynsets(relationType);
 		for (ISynsetID sID : sIDs) {
 			ISynset hS = dict.getSynset(sID);
+			List<String> _trace = new LinkedList<>(trace);
+			_trace.add(hS.getGloss() + " (" + relationType.getName() + ")");
 			for (IWord h : hS.getWords()) {
 //				if (h.getLemma().equals("bridge")) {
 //					System.out.println("stop");
 //				}
-				addSynonym(res, h.getLemma(), scoreInThisDepth);
+
+				List<String> __trace = new LinkedList<>(trace);
+				__trace.add(h.getLemma() + " (" + relationType.getName() + ")");
+				addSynonym(res, h.getLemma(), __trace, scoreInThisDepth);
 			}
-			addSynonyms(res, getRelatedWords(hS, depth + 1, maxDepth, relationType, assignDepthPenalty));
+			addSynonyms(res, getRelatedWords(hS, depth + 1, maxDepth, relationType, assignDepthPenalty, _trace));
 		}
 		return res;
 	}

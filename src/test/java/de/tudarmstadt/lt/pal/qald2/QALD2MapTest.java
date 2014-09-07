@@ -23,14 +23,15 @@ import org.junit.runners.Parameterized;
 import org.xml.sax.SAXException;
 
 import de.tudarmstadt.lt.pal.KnowledgeBaseConnector;
-import de.tudarmstadt.lt.pal.TripleMapper;
+import de.tudarmstadt.lt.pal.Query;
+import de.tudarmstadt.lt.pal.QueryMapper;
 import de.tudarmstadt.lt.pal.util.DateUtil;
 
 @RunWith(Parameterized.class)
 public class QALD2MapTest {
 	QALD2Entry entry;
 	KnowledgeBaseConnector kb = new KnowledgeBaseConnector(/*"/Users/jsimon/No-Backup/dbpedia/data", null*/);
-	TripleMapper tripleMapper = new TripleMapper(kb);
+	QueryMapper tripleMapper = new QueryMapper(kb);
 	
 	public QALD2MapTest(String question, QALD2Entry entry) {
 		this.entry = entry;
@@ -56,14 +57,14 @@ public class QALD2MapTest {
 	public void test() throws ParseException {
 		Set<String> answers = new HashSet<String>();
 
-		String query = tripleMapper.getBestSPARQLQuery(entry.pseudoQuery);
+		Query query = tripleMapper.getBestSPARQLQuery(entry.pseudoQuery);
 		assertTrue(query != null);
 		System.out.println("QUERY: " + query);
 		System.out.println("======= ANSWER =======");
 		String focusVar = entry.pseudoQuery.focusVar.name;
 		try {
 			System.out.println("?" + focusVar + ":");
-			answers.addAll(kb.query(query, focusVar));
+			answers.addAll(kb.query(query));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

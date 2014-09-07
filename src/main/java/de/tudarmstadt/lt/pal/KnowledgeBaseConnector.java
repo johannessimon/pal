@@ -23,8 +23,9 @@ import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
 
-import de.tudarmstadt.lt.pal.SPARQLTriple.TypeConstraint;
-import de.tudarmstadt.lt.pal.SPARQLTriple.TypeConstraint.BasicType;
+import de.tudarmstadt.lt.pal.Triple.TypeConstraint;
+import de.tudarmstadt.lt.pal.Triple.Variable;
+import de.tudarmstadt.lt.pal.Triple.TypeConstraint.BasicType;
 import de.tudarmstadt.lt.pal.util.ComparablePair;
 
 /**
@@ -231,10 +232,10 @@ public class KnowledgeBaseConnector {
 		}
 	}
 	
-	List<ComparablePair<Resource, Float>> getTypeCandidates(Collection<ComparablePair<String, Float>> nameCandidates) {
+	List<ComparablePair<Resource, Float>> getTypeCandidates(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
 		List<ComparablePair<Resource, Float>> types = new LinkedList<>();
-		for (ComparablePair<String, Float> c : nameCandidates) {
-			String name = formatResourceName(c.key);
+		for (ComparablePair<MappedString, Float> c : nameCandidates) {
+			String name = formatResourceName(c.key.word);
 			for (Entry<Resource, Collection<String>> typeEntry : classesInUse.entrySet()) {
 				Resource type = typeEntry.getKey();
 				Collection<String> labels = typeEntry.getValue();
@@ -267,13 +268,13 @@ public class KnowledgeBaseConnector {
 		return uri;
 	}
 	
-	List<ComparablePair<String, Float>> getResourceCandidates(String name, int limit) {
+	List<ComparablePair<MappedString, Float>> getResourceCandidates(String name, int limit) {
 		System.out.println("Searching resources... [" + name + "]");
 		if (name.contains("#")) {
 			int sepIndex = name.indexOf('#');
 			name = name.substring(0, sepIndex);
 		}
-		List<ComparablePair<String, Float>> result = new LinkedList<>();
+		List<ComparablePair<MappedString, Float>> result = new LinkedList<>();
 		{
 			String queryString = "SELECT DISTINCT ?subject ?name WHERE { \n"
 				               + "  { ?subject foaf:name ?name . ?name <bif:contains> \"'" + name + "'\"} UNION\n"
@@ -296,6 +297,8 @@ public class KnowledgeBaseConnector {
 					String rName = soln.getLiteral("name").getString();
 					Resource r = soln.getResource("subject");
 					if (r != null) {
+						String shortUri = getSPARQLResourceString(r.getURI());
+						List<String> trace = new LinkedList<>();
 						float labelScore = (float)name.length() / rName.length();
 						String rNameFromURI = getResourceName(r.getURI());
 						float resourceNameScore = 1.0f - (float)Math.abs(rNameFromURI.length() - name.length()) / rNameFromURI.length();
@@ -304,8 +307,11 @@ public class KnowledgeBaseConnector {
 						float inexactMatchPenalty = 0.5f;
 						if (comboScore < 1.0f) {
 							comboScore = comboScore * inexactMatchPenalty;
+							trace.add(shortUri + " (partial match)");
+						} else {
+							trace.add(shortUri + " (exact match)");
 						}
-						result.add(new ComparablePair<String, Float>(r.getURI(), comboScore));
+						result.add(new ComparablePair<MappedString, Float>(new MappedString(shortUri, trace), comboScore));
 					}
 				}
 			} catch (Exception e) {
@@ -319,6 +325,35 @@ public class KnowledgeBaseConnector {
 	}
 	
 	private static int numQueries = 0;
+	
+
+	/**
+	 * Executes the specified SPARQL query and returns the result(s) with
+	 * respect to the focus variable
+	 */
+	public Collection<String> query(Query query) {
+		String queryStr = queryToSPARQL(query);
+		return query(queryStr, query.focusVar.name);
+	}
+	
+	String queryToSPARQL(Query q) {
+		String queryStr = "SELECT DISTINCT ?" + q.focusVar.name + " WHERE {\n";
+		for (Variable var : q.vars.values()) {
+			if (var.mappedType != null) {
+				queryStr += getTypeConstraintSPARQLString(var.mappedType, var.name);
+			}
+		}
+		for (Triple t : q.triples) {
+			queryStr += t.subject.sparqlString() + " ";
+			queryStr += t.predicate.sparqlString() + " ";
+			queryStr += t.object.sparqlString() + ".\n";
+		}
+
+		final int RESULT_LIMIT = 1000;
+		queryStr += "} LIMIT " + RESULT_LIMIT;
+		return queryStr;
+	}
+	
 	/**
 	 * Executes the specified SPARQL query and returns the result(s) with
 	 * respect to the focus variable
@@ -375,13 +410,13 @@ public class KnowledgeBaseConnector {
 		if (tc == null) {
 			return "";
 		} else if (tc.basicType == BasicType.Resource) {
-			return "?" + varName + " a " + getSPARQLResourceString(tc.typeURI) + " . ";
+			return "?" + varName + " a " + getSPARQLResourceString(tc.typeURI) + " . \n";
 		} else/* if (tc.basicType == BasicType.Literal)*/ {
 			String res = "FILTER(ISLITERAL(?" + varName + ")";
 			if (tc.typeURI != null) {
 				res += " && DATATYPE(?" + varName + ") = " + getSPARQLResourceString(tc.typeURI);
 			}
-			res += ") . ";
+			res += ") . \n";
 			return res;
 		}
 	}
@@ -423,14 +458,14 @@ public class KnowledgeBaseConnector {
 	/**
 	 * nameCandidates must be sorted in ascending order
 	 */
-	Collection<ComparablePair<String, Float>> getPropertyCandidates(List<ComparablePair<String, Float>> nameCandidates, String subjectURI, String objectURI,
+	Collection<ComparablePair<MappedString, Float>> getPropertyCandidates(List<ComparablePair<MappedString, Float>> nameCandidates, String subjectURI, String objectURI,
 			                                                          TypeConstraint subjectTC, TypeConstraint objectTC) {
 		// This doesn't make much sense (we need at least one constraint, otherwise we'll query the entire DB)
 		if (subjectURI == null && objectURI == null && subjectTC == null && objectTC == null) {
 			return new LinkedList<>();
 		}
-		String querySubject = subjectURI == null ? "?s" : getSPARQLResourceString(subjectURI);
-		String queryObject = objectURI == null ? "?o" : getSPARQLResourceString(objectURI);
+		String querySubject = subjectURI == null ? "?s" : subjectURI;
+		String queryObject = objectURI == null ? "?o" : objectURI;
 		String query = "SELECT ?p ";
 		// Count number of property "connections" if we have no clue about the property
 		boolean useCountScore = true;//nameCandidates == null;// && subjectIsVar ^ objectIsVar;
@@ -468,7 +503,7 @@ public class KnowledgeBaseConnector {
 			return new LinkedList<>();
 		}
 				
-		List<ComparablePair<String, Float>> result = new LinkedList<>();
+		List<ComparablePair<MappedString, Float>> result = new LinkedList<>();
 		while (propPreCandidates.hasNext()) {
 			QuerySolution sol = propPreCandidates.next();
 			Resource pRes = sol.getResource("p");
@@ -477,6 +512,7 @@ public class KnowledgeBaseConnector {
 				break;
 			}
 			String pUri = pRes.getURI();
+			String pUriShortForm = getSPARQLResourceString(pUri);
 			// Assign a very small bonus for higher number of connections
 			// -> should only make a difference for near-tie situations
 			float countScoreBonus = 0.0f;
@@ -500,14 +536,18 @@ public class KnowledgeBaseConnector {
 			
 			String pName = formatResourceName(pRes.getLocalName());
 			if (nameCandidates != null && !nameCandidates.isEmpty()) {
-				for (ComparablePair<String, Float> candidate : nameCandidates) {
-					if (pName.startsWith(candidate.key)) {
-						float score = (float)candidate.key.length() / pName.length() * candidate.value * propertyTypeScore + countScoreBonus;
-						result.add(new ComparablePair<String, Float>(pUri, score));
+				for (ComparablePair<MappedString, Float> candidate : nameCandidates) {
+					String candidateWord = candidate.key.word;
+					if (pName.startsWith(candidateWord)) {
+						float score = (float)candidateWord.length() / pName.length() * candidate.value * propertyTypeScore + countScoreBonus;
+						MappedString mappedPUri = new MappedString(pUriShortForm, candidate.key.trace);
+						mappedPUri.trace.add(pUriShortForm + " (URI match)");
+						result.add(new ComparablePair<MappedString, Float>(mappedPUri, score));
 					}
 				}
 			} else {
-				result.add(new ComparablePair<String, Float>(pUri, countScoreBonus));
+				MappedString mappedPUri = new MappedString(pUriShortForm);
+				result.add(new ComparablePair<MappedString, Float>(mappedPUri, countScoreBonus));
 			}
 		}
 		Collections.sort(result);

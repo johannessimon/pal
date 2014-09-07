@@ -15,7 +15,7 @@ import edu.stanford.nlp.semgraph.SemanticGraph;
  */
 public class NLI {
 	KnowledgeBaseConnector kb = new KnowledgeBaseConnector(/*"/Users/jsimon/No-Backup/dbpedia/data", "http://dbpedia.org/sparql"*/);
-	TripleMapper tripleMapper = new TripleMapper(kb);
+	QueryMapper tripleMapper = new QueryMapper(kb);
 	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
 	StanfordDependencyParser depParser = new StanfordDependencyParser("/Users/jsimon/No-Backup/stanford-parser-tmp");
 
@@ -45,16 +45,16 @@ public class NLI {
 	public Collection<String> run(String text) {
 		List<String> answers = new LinkedList<String>();
 		SemanticGraph dependencies = depParser.parse(text);
-		PseudoQuery pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
+		Query pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
 		System.out.println("PSEUDO QUERY: " + pseudoQuery);
 
-		String query = tripleMapper.getBestSPARQLQuery(pseudoQuery);
+		Query query = tripleMapper.getBestSPARQLQuery(pseudoQuery);
 		System.out.println("QUERY: " + query);
 		System.out.println("======= ANSWER =======");
 		try {
 			String focusVar = pseudoQuery.focusVar.name;
 			System.out.println("?" + focusVar + ":");
-			Collection<String> _answers = kb.query(query, focusVar);
+			Collection<String> _answers = kb.query(query);
 			answers.addAll(_answers);
 		} catch (Exception e) {
 			e.printStackTrace();

@@ -1,14 +1,21 @@
 package de.tudarmstadt.lt.pal;
 
+import java.util.List;
+
 
 /**
  * Represents a triple that can be used in a SPARQL query. May contain
  * yet unmapped properties/resources.
  */
-public class SPARQLTriple {
+public class Triple implements Cloneable {
 	
-	public static abstract class Element {
+	public static abstract class Element implements Cloneable {
 		public String name;
+		public List<String> trace;
+		
+		public String sparqlString() {
+			return name;
+		}
 
 		@Override
 		public int hashCode() {
@@ -34,6 +41,18 @@ public class SPARQLTriple {
 				return false;
 			return true;
 		}
+		
+		@Override
+		public Object clone() {
+			Object clone = null;
+			try {
+				clone = super.clone();
+			} catch (CloneNotSupportedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			return clone;
+		}
 	}
 	
 	public static class TypeConstraint {
@@ -47,6 +66,11 @@ public class SPARQLTriple {
 		public TypeConstraint(BasicType basicType, String typeURI) {
 			this.basicType = basicType;
 			this.typeURI = typeURI;
+		}
+		
+		@Override
+		public String toString() {
+			return typeURI + " (" + basicType + ")";
 		}
 	}
 	
@@ -112,14 +136,21 @@ public class SPARQLTriple {
 			Unknown
 		}
 		
-		Type type;
+		Type unmappedType;
+		TypeConstraint mappedType;
 		
-		public Variable(String name, Type type) {
+		public Variable(String name, Type unmappedType) {
 			this.name = name;
-			this.type = type;
+			this.unmappedType = unmappedType;
 		}
+		/*
+		private Variable(String name, TypeConstraint mappedType) {
+			this.name = name;
+			this.unmappedType = null;
+			this.mappedType = mappedType;
+		}*/
 		
-		public String toString() {
+		public String sparqlString() {
 			return "?" + name;
 		}
 
@@ -127,7 +158,7 @@ public class SPARQLTriple {
 		public int hashCode() {
 			final int prime = 31;
 			int result = super.hashCode();
-			result = prime * result + ((type == null) ? 0 : type.hashCode());
+			result = prime * result + ((unmappedType == null) ? 0 : unmappedType.hashCode());
 			return result;
 		}
 
@@ -140,9 +171,15 @@ public class SPARQLTriple {
 			if (getClass() != obj.getClass())
 				return false;
 			Variable other = (Variable) obj;
-			if (type != other.type)
+			if (unmappedType != other.unmappedType)
 				return false;
 			return true;
+		}
+
+		@Override
+		public String toString() {
+			return "?" + name + " (" + unmappedType + ", "
+					+ mappedType + ")";
 		}
 	}
 	
@@ -150,7 +187,7 @@ public class SPARQLTriple {
 	public Element predicate;
 	public Element object;
 	
-	public SPARQLTriple(Element s, Element p, Element o) {
+	public Triple(Element s, Element p, Element o) {
 		subject = s;
 		predicate = p;
 		object = o;
@@ -179,7 +216,7 @@ public class SPARQLTriple {
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		SPARQLTriple other = (SPARQLTriple) obj;
+		Triple other = (Triple) obj;
 		if (object == null) {
 			if (other.object != null)
 				return false;

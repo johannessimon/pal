@@ -23,10 +23,10 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
-import de.tudarmstadt.lt.pal.PseudoQuery;
-import de.tudarmstadt.lt.pal.SPARQLTriple;
-import de.tudarmstadt.lt.pal.SPARQLTriple.Constant;
-import de.tudarmstadt.lt.pal.SPARQLTriple.Variable;
+import de.tudarmstadt.lt.pal.Query;
+import de.tudarmstadt.lt.pal.Triple;
+import de.tudarmstadt.lt.pal.Triple.Constant;
+import de.tudarmstadt.lt.pal.Triple.Variable;
 
 /**
  * Parser for the QALD-2 challenge <br/>
@@ -119,8 +119,8 @@ public class QALD2XMLParser {
 				
 				Node pseudoQueryNode = doc2 != null ? doc2.getElementById(Integer.toString(qald2Entry.id)) : null;
 				if (pseudoQueryNode != null && pseudoQueryNode.getNodeType() == Node.ELEMENT_NODE) {
-					qald2Entry.pseudoQuery = new PseudoQuery();
-					qald2Entry.pseudoQuery.triples = new HashSet<SPARQLTriple>();
+					qald2Entry.pseudoQuery = new Query();
+					qald2Entry.pseudoQuery.triples = new HashSet<Triple>();
 					Element pseudoQueryElement = (Element)pseudoQueryNode;
 					
 					Map<String, Variable> variables = new HashMap<String, Variable>();
@@ -137,7 +137,7 @@ public class QALD2XMLParser {
 					for (int j = 0; j < pseudoTriples.getLength(); j++) {
 						Node triple = pseudoTriples.item(j);
 						String[] elements = triple.getTextContent().split("\t");
-						SPARQLTriple.Element[] sparqlElements = new SPARQLTriple.Element[3];
+						Triple.Element[] sparqlElements = new Triple.Element[3];
 						if (elements.length == 3) {
 							for (int k = 0; k < 3; k++) {
 								String e = elements[k];
@@ -150,7 +150,7 @@ public class QALD2XMLParser {
 									sparqlElements[k] = new Constant(e, Constant.Type.Unmapped);
 								}
 							}
-							SPARQLTriple sparqlTriple = new SPARQLTriple(sparqlElements[0], sparqlElements[1], sparqlElements[2]);
+							Triple sparqlTriple = new Triple(sparqlElements[0], sparqlElements[1], sparqlElements[2]);
 							qald2Entry.pseudoQuery.triples.add(sparqlTriple);
 						}
 					}

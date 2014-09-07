@@ -16,7 +16,7 @@ import org.junit.runners.Parameterized;
 import org.xml.sax.SAXException;
 
 import de.tudarmstadt.lt.pal.KnowledgeBaseConnector;
-import de.tudarmstadt.lt.pal.PseudoQuery;
+import de.tudarmstadt.lt.pal.Query;
 import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
 import de.tudarmstadt.lt.pal.stanford.StanfordPseudoQueryBuilder;
 import edu.stanford.nlp.semgraph.SemanticGraph;
@@ -52,7 +52,7 @@ public class QALD2ParseTest {
 	public void test() throws ParseException {
 		StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
 		SemanticGraph dependencies = depParser.parse(entry.question);
-		PseudoQuery pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
+		Query pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
 		assertEquals(entry.pseudoQuery, pseudoQuery);
 	}
 }
