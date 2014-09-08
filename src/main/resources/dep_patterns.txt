@@ -1,0 +1,7 @@
+y ? ?	be|have *subj* *
+? y y	be|have *obj*|*dep*|*prep* *
+y x x	*#n* prep_of *
+y x ?	* prep_of|nsubj|nsubjpass *
+x * y	*#n* prep *
+? x y	* agent|dobj|prep *
+? ? y	* advmod *

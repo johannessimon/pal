@@ -62,7 +62,6 @@ public class QALD2Test {
 	@Test
 	public void test() throws ParseException {
 		Set<String> answers = new HashSet<String>();
-		StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
 		SemanticGraph dependencies = depParser.parse(entry.question);
 		Query pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
 

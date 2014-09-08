@@ -1,9 +1,12 @@
 package de.tudarmstadt.lt.pal.stanford;
 
+import java.io.File;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
+import de.tudarmstadt.lt.pal.util.DependencyPatternParser;
+import de.tudarmstadt.lt.pal.util.DependencyPatternParser.DependencyPattern;
 import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
@@ -16,6 +19,13 @@ import edu.stanford.nlp.trees.GrammaticalRelation;
  * any mapping between natural language and actual ontology elements.
  */
 public class StanfordTripleExtractor {
+	Collection<DependencyPattern> patterns;
+	
+	public StanfordTripleExtractor() {
+		File triplePatternFile = new File("src/main/resources/dep_patterns.txt");
+		patterns = DependencyPatternParser.parse(triplePatternFile);
+	}
+	
 	/**
 	 * Builds StanfordTriple's consisting of nodes from a stanford dependency tree (as opposed to SPARQLTriples)
 	 */
@@ -51,6 +61,7 @@ public class StanfordTripleExtractor {
 		IndexedWord object = null;
 		for (IndexedWord child : children) {
 			StanfordTriple childT = handleNode(child);
+			
 			// If a dependency implies a semantic constraint but does not
 			// specify either subject or object, then this is determined by
 			// the head of the parent dependency
@@ -76,50 +87,24 @@ public class StanfordTripleExtractor {
 			SemanticGraphEdge edge = deps.getAllEdges(node, child).get(0);
 			GrammaticalRelation rel = edge.getRelation();
 			String relName = edge.getRelation().getShortName();
-			// "be" as verb is a special case, as predicate is usually "hidden" in adjective
-			if (node.lemma().equals("be") || node.lemma().equals("have")) {
-				if (relName.contains("subj")) {
-					subject = child;
-				} else if (relName.contains("obj") || relName.contains("dep") || relName.contains("prep")) {
-					predicate = child;
-					object = child;
+			
+			for (DependencyPattern depPattern : patterns) {
+				if (depPattern.matches(node, rel, child)) {
+					subject = depPattern.mapTripleElement(subject, depPattern.subjectMapping, node, rel, child);
+					predicate = depPattern.mapTripleElement(predicate, depPattern.predicateMapping, node, rel, child);
+					object = depPattern.mapTripleElement(object, depPattern.objectMapping, node, rel, child);
+					break;
 				}
-			} else if (relName.equals("agent") || relName.equals("dobj")) {
-				predicate = node;
-				object = child;
-			// Special case preposition (reversion of subject/object,
-		    // parent is predicate)
-			} else if (relName.equals("prep") &&
-					   rel.getSpecific() != null && rel.getSpecific().equals("of")) {
-				// The name of the relation (e.g. "state of" or "height of" at the same
-				// time hints at the type of the object (height -> number)
-				if (node.tag().startsWith("N")) {
-					object = node;
-				}
-				predicate = node;
-				subject = child;
-			} else if (relName.equals("prep")) {
-				if (node.tag().startsWith("N")) {
-					// In this case we don't know anything about the predicate and will use
-					// a wildcard (thus constraint = "there must be a relation between subject/object")
-					predicate = null;
-					subject = node;
-				} else {
-					// TODO: "born in" -> take "bear" as predicate and interprate "in" as dbpedia-owl:Place for target
-					predicate = node;
-				}
-				object = child;
-			} else if (relName.equals("nsubj") || relName.equals("nsubjpass")) {
+			}
+			
+			if (relName.equals("nsubj") || relName.equals("nsubjpass")) {
 				// question word as predicate doesn't make sense
 				if (!node.tag().startsWith("W")) {
-					predicate = node;
-					subject = child;
 					if (child.value().toLowerCase().equals("who")) {
 						focusWord = child;
 					}
 				}
 			} else if (relName.equals("advmod")) {
-				object = child;
 				if (child.tag().startsWith("W")) {
 					focusWord = child;
 				}
