@@ -404,17 +404,6 @@ public class KnowledgeBaseConnector {
 			query += "(COUNT(" + countVar + ") AS ?count)";
 		}
 		query += " WHERE { ";
-		// We know that the object is a resource, exclude all non-object properties in advance (e.g. DBPedia properties)
-//		if (object != null) {
-//			query += "?p a owl:ObjectProperty . ";
-//		}
-		// This will take too long, append a lucene text search (though this has problems in some cases, e.g. when the prefix is too short)
-//		if (subject == null && object == null) {
-//			int numCandidates = 10;
-//			Collection<ComparablePair<String, Float>> reducedNamedCandidates = nameCandidates.subList(0, Math.min(numCandidates, nameCandidates.size()));
-//			query += "?p text:query " + getLuceneQueryString(reducedNamedCandidates) + " . ";
-//			query += "?p rdfs:label ?l . ?l <bif:contains> " + getLuceneQueryString(reducedNamedCandidates) + " . ";
-//		}
 		query += querySubject + " ?p " + queryObject + " . ";
 		query += getTypeConstraintSPARQLString(subjectTC, "s");
 		query += getTypeConstraintSPARQLString(objectTC, "o");
@@ -489,8 +478,5 @@ public class KnowledgeBaseConnector {
 	
 	public void close() {
 		System.out.println("Closing KB Connector. Number of queries: " + numQueries);
-//		ontModel.close();
-//		model.close();
-//		data.end();
 	}
 }
