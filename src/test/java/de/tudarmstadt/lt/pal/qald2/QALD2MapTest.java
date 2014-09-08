@@ -30,7 +30,7 @@ import de.tudarmstadt.lt.pal.util.DateUtil;
 @RunWith(Parameterized.class)
 public class QALD2MapTest {
 	QALD2Entry entry;
-	KnowledgeBaseConnector kb = new KnowledgeBaseConnector(/*"/Users/jsimon/No-Backup/dbpedia/data", null*/);
+	KnowledgeBaseConnector kb = new KnowledgeBaseConnector("http://localhost:8890/sparql/");
 	QueryMapper tripleMapper = new QueryMapper(kb);
 	
 	public QALD2MapTest(String question, QALD2Entry entry) {

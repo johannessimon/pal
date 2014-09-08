@@ -15,8 +15,7 @@ import de.tudarmstadt.lt.pal.Triple.TypeConstraint;
 import de.tudarmstadt.lt.pal.util.ComparablePair;
 
 public class KnowledgeBaseConnectorTest extends TestCase {
-	KnowledgeBaseConnector kb = new KnowledgeBaseConnector(/*"/Users/jsimon/No-Backup/dbpedia/data", "http://dbpedia.org/sparql"*/);
-//	TripleMapper tripleMapper = new TripleMapper(kb);
+	KnowledgeBaseConnector kb = new KnowledgeBaseConnector("http://localhost:8890/sparql/");
 	
 	@Test
 	public void testGetPropertyCandidates() {

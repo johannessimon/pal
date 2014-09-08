@@ -14,7 +14,7 @@ import edu.stanford.nlp.semgraph.SemanticGraph;
  * Simple front-end for PAL using the console.
  */
 public class NLI {
-	KnowledgeBaseConnector kb = new KnowledgeBaseConnector(/*"/Users/jsimon/No-Backup/dbpedia/data", "http://dbpedia.org/sparql"*/);
+	KnowledgeBaseConnector kb = new KnowledgeBaseConnector("http://localhost:8890/sparql/");
 	QueryMapper tripleMapper = new QueryMapper(kb);
 	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
 	StanfordDependencyParser depParser = new StanfordDependencyParser("/Users/jsimon/No-Backup/stanford-parser-tmp");

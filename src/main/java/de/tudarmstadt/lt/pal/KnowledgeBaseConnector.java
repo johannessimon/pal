@@ -101,11 +101,12 @@ public class KnowledgeBaseConnector {
 	/**
 	 * Constructor to connect to local Virtuoso server
 	 */
-	public KnowledgeBaseConnector() {
+	public KnowledgeBaseConnector(String sparqlEndpoint) {
 //		sparqlEndpoint = "http://localhost:3030/ds/query";
 //		sparqlEndpoint = "http://localhost:8001/sparql/"; // nginx cache
-		sparqlEndpoint = "http://localhost:8890/sparql/"; // virtuoso
+//		sparqlEndpoint = "http://localhost:8890/sparql/"; // virtuoso
 //		sparqlEndpoint = "http://dbpedia.org/sparql/"; // DBPedia public
+		this.sparqlEndpoint = sparqlEndpoint;
 		
 		fillNamespacePrefixes();
 		retrieveClassesInUse();
