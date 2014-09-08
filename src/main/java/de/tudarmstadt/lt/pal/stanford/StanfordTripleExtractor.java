@@ -20,10 +20,11 @@ import edu.stanford.nlp.trees.GrammaticalRelation;
  */
 public class StanfordTripleExtractor {
 	Collection<DependencyPattern> patterns;
+	Collection<DependencyPattern> focusPatterns;
 	
 	public StanfordTripleExtractor() {
-		File triplePatternFile = new File("src/main/resources/dep_patterns.txt");
-		patterns = DependencyPatternParser.parse(triplePatternFile);
+		patterns = DependencyPatternParser.parse(new File("src/main/resources/dep_patterns.txt"));
+		focusPatterns = DependencyPatternParser.parse(new File("src/main/resources/focus_patterns.txt"));
 	}
 	
 	/**
@@ -97,7 +98,6 @@ public class StanfordTripleExtractor {
 			
 			SemanticGraphEdge edge = deps.getAllEdges(node, child).get(0);
 			GrammaticalRelation rel = edge.getRelation();
-			String relName = edge.getRelation().getShortName();
 			
 			for (DependencyPattern depPattern : patterns) {
 				if (depPattern.matches(node, rel, child)) {
@@ -108,20 +108,10 @@ public class StanfordTripleExtractor {
 				}
 			}
 			
-			if (relName.equals("nsubj") || relName.equals("nsubjpass")) {
-				// question word as predicate doesn't make sense
-				if (!node.tag().startsWith("W")) {
-					if (child.value().toLowerCase().equals("who")) {
-						focusWord = child;
-					}
-				}
-			} else if (relName.equals("advmod")) {
-				if (child.tag().startsWith("W")) {
-					focusWord = child;
-				}
-			} else if (relName.equals("det")) {
-				if (child.value().toLowerCase().equals("which")) {
-					focusWord = node;
+			for (DependencyPattern focusPattern : focusPatterns) {
+				if (focusPattern.matches(node, rel, child)) {
+					focusWord = focusPattern.mapTripleElement(null, focusPattern.subjectMapping, node, rel, child);
+					break;
 				}
 			}
 		}
