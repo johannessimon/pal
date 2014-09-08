@@ -144,8 +144,10 @@ public class DependencyPatternParser {
 		res.childPatterns = mapDependencyNodePattern(depPattern[2]);
 		
 		res.subjectMapping = mapTripleElementMapping(triplePattern[0]);
-		res.predicateMapping = mapTripleElementMapping(triplePattern[1]);
-		res.objectMapping = mapTripleElementMapping(triplePattern[2]);
+		if (triplePattern.length > 1) {
+			res.predicateMapping = mapTripleElementMapping(triplePattern[1]);
+			res.objectMapping = mapTripleElementMapping(triplePattern[2]);
+		}
 		
 		return res;
 	}

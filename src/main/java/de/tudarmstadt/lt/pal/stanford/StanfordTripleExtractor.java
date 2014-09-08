@@ -35,7 +35,11 @@ public class StanfordTripleExtractor {
 		triples = new HashSet<>();
 //		varConstraints = new HashMap<>();
 		IndexedWord root = deps.getFirstRoot();
-		handleNode(root, 0);
+		try {
+			handleNode(root, 0);
+		} catch (DependencyTreeTooDeepException e) {
+			System.err.println("Error: Dependency tree is either too deep or contains infinite loop!");
+		}
 		return triples;
 	}
 	
@@ -48,14 +52,18 @@ public class StanfordTripleExtractor {
 	
 	// prevent possible infinite loops
 	private final static int MAX_NODE_DEPTH = 10;
-	
 	/**
 	 * Recursively collect triples over dependency graph
+	 * @throws DependencyTreeTooDeepException 
 	 */
-	private StanfordTriple handleNode(IndexedWord node, int depth) {
+	private StanfordTriple handleNode(IndexedWord node, int depth) throws DependencyTreeTooDeepException {
+		if (depth > MAX_NODE_DEPTH) {
+			throw new DependencyTreeTooDeepException();
+		}
+		
 		Collection<IndexedWord> children = deps.getChildren(node);
-		// we have a leaf! (or have a reached the maximum depth)
-		if (children.isEmpty() || depth > MAX_NODE_DEPTH) {
+		// we have a leaf!
+		if (children.isEmpty()) {
 			return null;
 		}
 		
@@ -138,5 +146,9 @@ public class StanfordTripleExtractor {
 				&& (wordValue.equals("give") ||
 					wordValue.equals("tell") ||
 					wordValue.equals("list"));
+	}
+	
+	private class DependencyTreeTooDeepException extends Exception {
+		private static final long serialVersionUID = 1L;
 	}
 }

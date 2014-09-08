@@ -50,10 +50,10 @@ public class NLI {
 
 		Query query = tripleMapper.getBestSPARQLQuery(pseudoQuery);
 		System.out.println("QUERY: " + query);
-		System.out.println("======= ANSWER =======");
+//		System.out.println("======= ANSWER =======");
 		try {
-			String focusVar = pseudoQuery.focusVar.name;
-			System.out.println("?" + focusVar + ":");
+//			String focusVar = pseudoQuery.focusVar.name;
+//			System.out.println("?" + focusVar + ":");
 			Collection<String> _answers = kb.query(query);
 			answers.addAll(_answers);
 		} catch (Exception e) {

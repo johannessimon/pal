@@ -64,7 +64,11 @@ public class QALD2Test {
 		Set<String> answers = new HashSet<String>();
 		SemanticGraph dependencies = depParser.parse(entry.question);
 		Query pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
-
+		assertTrue(pseudoQuery.triples != null);
+		assertTrue(pseudoQuery.triples.size() > 0);
+		assertTrue(pseudoQuery.vars != null);
+		assertTrue(pseudoQuery.vars.size() > 0);
+		assertTrue(pseudoQuery.focusVar != null);
 		Query query = tripleMapper.getBestSPARQLQuery(pseudoQuery);
 		assertTrue(query != null);
 		System.out.println("QUERY: " + query);

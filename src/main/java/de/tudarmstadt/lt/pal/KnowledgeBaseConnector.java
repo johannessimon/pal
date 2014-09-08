@@ -40,6 +40,11 @@ public class KnowledgeBaseConnector {
 //	Dataset data;
 	String sparqlEndpoint;
 	
+	private boolean checkIfLocalUriNameIsValidSPARQL(String localName) {
+		String invalidPattern = ".*\\.|.*[\\&\\/,].*";
+		return !localName.matches(invalidPattern);
+	}
+	
 	/**
 	 * Returns a short representation of the resource's URI using
 	 * known namespace prefixes. Uses <code>?varName</code> instead
@@ -51,7 +56,11 @@ public class KnowledgeBaseConnector {
 			String prefix = namespacePrefix.getValue();
 			if (uri.startsWith(ns)) {
 				String localName = uri.substring(ns.length());
-				return prefix + ":" + localName;
+				if (checkIfLocalUriNameIsValidSPARQL(localName)) {
+					 return prefix + ":" + localName;
+				}/* else {
+					System.err.println("URI contains bad local name: " + uri);
+				}*/
 			}
 		}
 		
@@ -174,10 +183,10 @@ public class KnowledgeBaseConnector {
 	private QueryExecution getQueryExec(String query) {
 		numQueries++;
 		query = getNamespacePrefixDeclarations() + "\n" + query;
-		System.out.println(query.replaceAll("\n", " "));
-		QueryExecution qexec;
+//		System.out.println(query.replaceAll("\n", " "));
+		QueryExecution qexec = null;
 //		if (sparqlEndpoint != null) {
-			qexec = QueryExecutionFactory.sparqlService(sparqlEndpoint, query);
+		qexec = QueryExecutionFactory.sparqlService(sparqlEndpoint, query);
 //		} else {
 //			qexec = QueryExecutionFactory.create(query, model);
 //		}
@@ -276,7 +285,7 @@ public class KnowledgeBaseConnector {
 	}
 	
 	List<ComparablePair<MappedString, Float>> getResourceCandidates(String name, int limit) {
-		System.out.println("Searching resources... [" + name + "]");
+//		System.out.println("Searching resources... [" + name + "]");
 		if (name.contains("#")) {
 			int sepIndex = name.indexOf('#');
 			name = name.substring(0, sepIndex);
@@ -328,7 +337,7 @@ public class KnowledgeBaseConnector {
 		}
 
 		Collections.sort(result);
-		System.out.println("Done searching resources. Results: " + result);
+//		System.out.println("Done searching resources. Results: " + result);
 		return result;
 	}
 	
@@ -396,13 +405,14 @@ public class KnowledgeBaseConnector {
 						Literal l = var.asLiteral();
 						varString = l.getValue().toString();
 					}
-					System.out.println(varString);
+//					System.out.println(varString);
 					res.add(varString);
 				}
 			}
+			qexec.close();
 		} catch (Exception e) {
 			e.printStackTrace();
-		} finally { qexec.close(); }
+		}
 		return res;
 	}
 	
@@ -513,7 +523,7 @@ public class KnowledgeBaseConnector {
 			qexec = getQueryExec(query);
 			propPreCandidates = qexec.execSelect();
 		} catch (Exception e) {
-			System.err.println("Error while executing query: " + e.getMessage());
+			System.err.println("Error while executing query: " + query);
 			return new LinkedList<>();
 		}
 				

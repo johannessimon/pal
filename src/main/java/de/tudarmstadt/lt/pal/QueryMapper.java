@@ -139,7 +139,7 @@ public class QueryMapper {
 		List<ComparablePair<Query, Float>> queryCandidates = buildSPARQLQuery(pseudoQuery);
 		for (ComparablePair<Query, Float> query : queryCandidates) {
 			try {
-				System.out.println("?" + pseudoQuery.focusVar.name + ":");
+//				System.out.println("?" + pseudoQuery.focusVar.name + ":");
 				Collection<String> answer = kb.query(query.key);
 				if (!answer.isEmpty()) {
 					return query.key;
@@ -173,8 +173,8 @@ public class QueryMapper {
 	}
 	
 	private List<ComparablePair<Query, Float>> _buildSPARQLQuery(Query pseudoQuery) {
-		System.out.println("Building sparql query for pseudo query:");
-		System.out.println(pseudoQuery);
+//		System.out.println("Building sparql query for pseudo query:");
+//		System.out.println(pseudoQuery);
 		List<ComparablePair<Query, Float>> queryCandidates = new LinkedList<>();
 		Query _baseQuery = (Query)pseudoQuery.clone();
 		_baseQuery.triples.clear();
@@ -218,7 +218,7 @@ public class QueryMapper {
 				// Only returns type constraint != null if object is a variable and has been assigned a type constraint
 
 				Collection<ComparablePair<MappedString, Float>> propCandidates = mapProperty(triple.predicate, subject.value, null, null, objectVar.mappedType);
-				System.out.println("prop candidates: " + propCandidates);
+//				System.out.println("prop candidates: " + propCandidates);
 				for (ComparablePair<MappedString, Float> scoredProp : propCandidates) {
 					String prop = scoredProp.key.value;
 					float comboScore = scoredSubject.value * scoredProp.value;
@@ -236,7 +236,7 @@ public class QueryMapper {
 				MappedString object = scoredObject.key;
 
 				Collection<ComparablePair<MappedString, Float>> propCandidates = mapProperty(triple.predicate, null, object.value, subjectVar.mappedType, null);
-				System.out.println("prop candidates: " + propCandidates);
+//				System.out.println("prop candidates: " + propCandidates);
 				for (ComparablePair<MappedString, Float> scoredProp : propCandidates) {
 					String prop = scoredProp.key.value;
 					float comboScore = scoredObject.value * scoredProp.value;
@@ -252,7 +252,7 @@ public class QueryMapper {
 		// Relations between two variables
 		} else if (subjectVar != null && objectVar != null && triple.predicate != null) {
 			Collection<ComparablePair<MappedString, Float>> propCandidates = mapProperty(triple.predicate, null, null, subjectVar.mappedType, objectVar.mappedType);
-			System.out.println("prop candidates: " + propCandidates);
+//			System.out.println("prop candidates: " + propCandidates);
 			for (ComparablePair<MappedString, Float> scoredProp : propCandidates) {
 				String prop = scoredProp.key.value;
 				Constant predicateElement = new Constant(prop, Constant.Type.Mapped);
