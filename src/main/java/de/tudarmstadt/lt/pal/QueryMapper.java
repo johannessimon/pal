@@ -9,8 +9,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import com.hp.hpl.jena.ontology.OntResource;
-
 import de.tudarmstadt.lt.pal.Triple.Constant;
 import de.tudarmstadt.lt.pal.Triple.Element;
 import de.tudarmstadt.lt.pal.Triple.TypeConstraint;
@@ -120,11 +118,9 @@ public class QueryMapper {
 			List<ComparablePair<MappedString, Float>> typeCandidates = kb.getTypeCandidates(nameCandidateSet);
 			if (typeCandidates != null && !typeCandidates.isEmpty()) {
 				MappedString r = typeCandidates.iterator().next().key;
-				OntResource or = kb.getOntResource(r.value);
-				if (or != null && or.isClass()) {
+				Set<String> typeClasses = kb.getResourceTypes(r.value);
+				if (typeClasses.contains(KnowledgeBaseConnector.OWL_CLASS_URI)) {
 					basicType = TypeConstraint.BasicType.Resource;
-				} else if (or != null && or.isDataRange()) {
-					basicType = TypeConstraint.BasicType.Literal;
 				}
 				typeURI = r;
 			}

@@ -11,8 +11,6 @@ import junit.framework.TestCase;
 
 import org.junit.Test;
 
-import com.hp.hpl.jena.ontology.OntProperty;
-
 import de.tudarmstadt.lt.pal.Triple.TypeConstraint;
 import de.tudarmstadt.lt.pal.util.ComparablePair;
 
@@ -41,12 +39,6 @@ public class KnowledgeBaseConnectorTest extends TestCase {
 		assertEquals(expected, actual);
 		
 		System.out.println(propCandidates);
-	}
-
-	@Test
-	public void testGetOntProperty() {
-		OntProperty p = kb.getOntProperty("http://dbpedia.org/ontology/author");
-		assertTrue(p != null);
 	}
 
 	@Test

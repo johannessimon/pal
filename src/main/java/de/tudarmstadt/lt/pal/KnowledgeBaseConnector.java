@@ -3,23 +3,18 @@ import java.net.URLDecoder;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
-import com.hp.hpl.jena.ontology.OntClass;
-import com.hp.hpl.jena.ontology.OntDocumentManager;
-import com.hp.hpl.jena.ontology.OntModel;
-import com.hp.hpl.jena.ontology.OntModelSpec;
-import com.hp.hpl.jena.ontology.OntProperty;
-import com.hp.hpl.jena.ontology.OntResource;
 import com.hp.hpl.jena.query.QueryExecution;
 import com.hp.hpl.jena.query.QueryExecutionFactory;
 import com.hp.hpl.jena.query.QuerySolution;
 import com.hp.hpl.jena.query.ResultSet;
 import com.hp.hpl.jena.rdf.model.Literal;
-import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
 
@@ -34,13 +29,15 @@ import de.tudarmstadt.lt.pal.util.StringUtil;
  */
 public class KnowledgeBaseConnector {
 	
-	OntModel ontModel;
 	String sparqlEndpoint;
 	
 	private boolean checkIfLocalUriNameIsValidSPARQL(String localName) {
 		String invalidPattern = ".*\\.|.*[\\&\\/,].*";
 		return !localName.matches(invalidPattern);
 	}
+	
+	public final static String OWL_CLASS_URI = "http://www.w3.org/2002/07/owl#Class";
+	public final static String OWL_OBJECT_PROPERTY_URI = "http://www.w3.org/2002/07/owl#ObjectProperty";
 	
 	/**
 	 * Returns a short representation of the resource's URI using
@@ -109,14 +106,6 @@ public class KnowledgeBaseConnector {
 //		sparqlEndpoint = "http://localhost:8001/sparql/"; // nginx cache
 		sparqlEndpoint = "http://localhost:8890/sparql/"; // virtuoso
 //		sparqlEndpoint = "http://dbpedia.org/sparql/"; // DBPedia public
-		ontModel = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM);
-		
-		OntDocumentManager dm = ontModel.getDocumentManager();
-		dm.addAltEntry("http://dbpedia.org/ontology/", "file:///Volumes/Bill/No-Backup/dbpedia37/download/dbpedia_3.7.owl");
-//		dm.addAltEntry("http://dbpedia.org/ontology/", "file:///Volumes/Bill/No-Backup/dbpedia39/download/dbpedia_3.9.owl");
-		dm.addAltEntry("http://xmlns.com/foaf/0.1/", "file:///Volumes/Bill/No-Backup/dbpedia37/download/foaf.rdf");
-		ontModel.read("http://dbpedia.org/ontology/");
-		ontModel.read("http://xmlns.com/foaf/0.1/");
 		
 		fillNamespacePrefixes();
 		retrieveClassesInUse();
@@ -129,13 +118,6 @@ public class KnowledgeBaseConnector {
 		QueryExecution qexec = null;
 		qexec = QueryExecutionFactory.sparqlService(sparqlEndpoint, query);
 		return qexec;
-	}
-	
-	/**
-	 * Returns the ontology property with the specified URI
-	 */
-	OntProperty getOntProperty(String uri) {
-		return ontModel.getOntProperty(uri);
 	}
 	
 	/**
@@ -354,18 +336,26 @@ public class KnowledgeBaseConnector {
 		return res;
 	}
 	
-	/**
-	 * Returns either an <code>OntClass</code> or a <code>DataRange</code> representation of the
-	 * given resource or null if no such representation exists.
-	 */
-	OntResource getOntResource(String r) {
-		if (r != null) {
-			OntResource ontR = ontModel.getOntResource(r);
-			if (ontR.isClass() || ontR.isDataRange()) {
-				return ontR;
+	private static Map<String, Set<String>> uriTypes = new HashMap<>();
+	synchronized Set<String> getResourceTypes(String uri) {
+		Set<String> types = uriTypes.get(uri);
+		if (types == null) {
+			types = new HashSet<>();
+			uriTypes.put(uri, types);
+			System.out.println(System.identityHashCode(uriTypes) + " " + uriTypes.size());
+			QueryExecution qexec;
+			ResultSet typeResults;
+			qexec = getQueryExec("SELECT ?t WHERE { <" + uri + "> a ?t }");
+			typeResults = qexec.execSelect();
+					
+			while (typeResults.hasNext()) {
+				QuerySolution sol = typeResults.next();
+				types.add(sol.getResource("t").getURI());
 			}
+		} else {
+			System.out.println("HIT");
 		}
-		return null;
+		return types;
 	}
 	
 	String getTypeConstraintSPARQLString(TypeConstraint tc, String varName) {
@@ -393,28 +383,6 @@ public class KnowledgeBaseConnector {
 		}
 		query.append("\"");
 		return query.toString();
-	}
-	
-	/**
-	 * Check if a type <code>toCheck</code> is either equal to or (if type is a class) a subclass of <code>type</code>
-	 * 
-	 * @return True if either <code>type</code> or <code>toCheck</code> is null or
-	 * if <code>toCheck</code> is (either directly or transitively) equal to <code>type</code>
-	 */
-	boolean checkTypeConstraint(OntResource type, OntResource toCheck) {
-		if (type == null || toCheck == null) {
-			return true;
-		}
-		// Class constraint (e.g. dbpedia-owl:Agent)
-		if (type.isClass()) {
-			OntClass ontClass = type.asClass();
-			return ontClass.hasSubClass(toCheck) || ontClass.equals(toCheck);
-			// Data range constraint (e.g. xsd:integer)
-		} else if (type.isDataRange()) {
-			return type.equals(toCheck);
-		} else {
-			return true;
-		}
 	}
 	
 	/**
@@ -483,14 +451,15 @@ public class KnowledgeBaseConnector {
 				// to be scored as high as a typed property with 10 items
 				countScoreBonus = 0.00001f * (float)Math.log(1 + sol.getLiteral("count").getInt());
 			}
-			OntProperty p = ontModel.getOntProperty(pUri);
+			Set<String> pTypes = getResourceTypes(pUri);
+			boolean pIsObjectProperty = pTypes.contains(OWL_OBJECT_PROPERTY_URI);
 			// We know that the object is a resource, exclude all non-object properties in advance (e.g. DBPedia properties)
-			if (objectURI != null && (p == null || !p.isObjectProperty())) {
+			if (objectURI != null && !pIsObjectProperty) {
 				continue;
 			}
 			float propertyTypeScore;
 			// Slightly prefer object properties over non-object properties
-			if (p != null && p.isObjectProperty()) {
+			if (pIsObjectProperty) {
 				propertyTypeScore = 1.01f;
 			} else {
 				propertyTypeScore = 1.00f;
