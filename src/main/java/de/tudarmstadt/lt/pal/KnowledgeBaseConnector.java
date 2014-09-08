@@ -34,10 +34,7 @@ import de.tudarmstadt.lt.pal.util.StringUtil;
  */
 public class KnowledgeBaseConnector {
 	
-//	Model model;
 	OntModel ontModel;
-//	InfModel infModel;
-//	Dataset data;
 	String sparqlEndpoint;
 	
 	private boolean checkIfLocalUriNameIsValidSPARQL(String localName) {
@@ -107,89 +104,30 @@ public class KnowledgeBaseConnector {
 	/**
 	 * Constructor to connect to local Virtuoso server
 	 */
-	/*public KnowledgeBaseConnector() {
-		sparqlEndpoint = "http://localhost:8890/sparql/";
-		VirtDataset data = new VirtDataset("jdbc:virtuoso://localhost:1111/charset=UTF-8/", "dba", "dba");
-		data.begin(ReadWrite.READ);
-		model = data.getNamedModel("http://dbpedia.org");
-		ontModel = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM, model);
-		ontModel.prepare();
-		Iterator<OntProperty> it = ontModel.listOntProperties();
-		Graph g = ontModel.getGraph();
-		while (it.hasNext()) {
-			OntProperty p = it.next();
-			System.out.println(p);
-			Resource r3 = ontModel.getResource(p.getURI());
-			boolean c = ontModel.containsResource(r3);
-			OntResource _r3 = r3.as(OntResource.class);
-			Resource r1 = ontModel.getOntResource(p.getURI());
-			Resource r2 = ontModel.getOntResource(p);
-		}
-		fillNamespacePrefixes();
-	}*/
-	
-	/**
-	 * Constructor to connect to local Fuseki server
-	 */
-	
 	public KnowledgeBaseConnector() {
 //		sparqlEndpoint = "http://localhost:3030/ds/query";
 //		sparqlEndpoint = "http://localhost:8001/sparql/"; // nginx cache
 		sparqlEndpoint = "http://localhost:8890/sparql/"; // virtuoso
-//		data = TDBFactory.createDataset("/Users/jsimon/No-Backup/dbpedia37/tdb");
-//		data = DatasetFactory.assemble(
-//			    "/Users/jsimon/No-Backup/dbpedia37/dbpedia37-fuseki.ttl", 
-//			    "http://localhost/dbpedia37#text_dataset") ;
-//		data.begin(ReadWrite.READ);
-//		model = data.getDefaultModel();
-//		ontModel = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM, model);
+//		sparqlEndpoint = "http://dbpedia.org/sparql/"; // DBPedia public
 		ontModel = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM);
-//		ontModel.setDynamicImports(true);
-//		ontModel.loadImports();
 		
 		OntDocumentManager dm = ontModel.getDocumentManager();
 		dm.addAltEntry("http://dbpedia.org/ontology/", "file:///Volumes/Bill/No-Backup/dbpedia37/download/dbpedia_3.7.owl");
+//		dm.addAltEntry("http://dbpedia.org/ontology/", "file:///Volumes/Bill/No-Backup/dbpedia39/download/dbpedia_3.9.owl");
 		dm.addAltEntry("http://xmlns.com/foaf/0.1/", "file:///Volumes/Bill/No-Backup/dbpedia37/download/foaf.rdf");
 		ontModel.read("http://dbpedia.org/ontology/");
 		ontModel.read("http://xmlns.com/foaf/0.1/");
 		
-//		ontModel.prepare();
-//		Iterator<OntClass> it = ontModel.listClasses();
-//		while (it.hasNext()) {
-//			System.out.println(it.next());
-//		}
 		fillNamespacePrefixes();
 		retrieveClassesInUse();
 	}
-	/*
-	public KnowledgeBaseConnector(String tdbDir) {
-		// Create a TDB-backed dataset
-		String modelDir = tdbDir;
-		data = TDBFactory.createDataset(modelDir);
-		data.begin(ReadWrite.READ);
-		// Get model inside the transaction
-		model = data.getDefaultModel();
-		sparqlEndpoint = null;
-		ontModel = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM, model);
-//		infModel = ModelFactory.createInfModel(ReasonerRegistry.getOWLMicroReasoner(), model);
-		fillNamespacePrefixes();
-	}
-	
-	public KnowledgeBaseConnector(String tdbDir, String sparqlEndpoint) {
-		this(tdbDir);
-		this.sparqlEndpoint = sparqlEndpoint;
-	}*/
 	
 	private QueryExecution getQueryExec(String query) {
 		numQueries++;
 		query = getNamespacePrefixDeclarations() + "\n" + query;
-//		System.out.println(query.replaceAll("\n", " "));
+		System.out.println(query.replace("\n", " "));
 		QueryExecution qexec = null;
-//		if (sparqlEndpoint != null) {
 		qexec = QueryExecutionFactory.sparqlService(sparqlEndpoint, query);
-//		} else {
-//			qexec = QueryExecutionFactory.create(query, model);
-//		}
 		return qexec;
 	}
 	
@@ -285,7 +223,7 @@ public class KnowledgeBaseConnector {
 	}
 	
 	List<ComparablePair<MappedString, Float>> getResourceCandidates(String name, int limit) {
-//		System.out.println("Searching resources... [" + name + "]");
+		System.out.println("Searching resources... [" + name + "]");
 		if (name.contains("#")) {
 			int sepIndex = name.indexOf('#');
 			name = name.substring(0, sepIndex);
@@ -337,7 +275,7 @@ public class KnowledgeBaseConnector {
 		}
 
 		Collections.sort(result);
-//		System.out.println("Done searching resources. Results: " + result);
+		System.out.println("Done searching resources. Results: " + result);
 		return result;
 	}
 	
@@ -386,7 +324,7 @@ public class KnowledgeBaseConnector {
 
 		final int RESULT_LIMIT = 1000;
 		if (!queryString.contains("LIMIT")) {
-			queryString += " LIMIT" + RESULT_LIMIT;
+			queryString += " LIMIT " + RESULT_LIMIT;
 		}
 		
 		QueryExecution qexec = getQueryExec(queryString);

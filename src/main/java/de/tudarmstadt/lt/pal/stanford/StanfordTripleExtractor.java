@@ -1,6 +1,6 @@
 package de.tudarmstadt.lt.pal.stanford;
 
-import java.io.File;
+import java.io.InputStream;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
@@ -23,8 +23,10 @@ public class StanfordTripleExtractor {
 	Collection<DependencyPattern> focusPatterns;
 	
 	public StanfordTripleExtractor() {
-		patterns = DependencyPatternParser.parse(new File("src/main/resources/dep_patterns.txt"));
-		focusPatterns = DependencyPatternParser.parse(new File("src/main/resources/focus_patterns.txt"));
+		InputStream depPatternsIS = getClass().getClassLoader().getResourceAsStream("dep_patterns.txt");
+		InputStream focusPatternsIS = getClass().getClassLoader().getResourceAsStream("focus_patterns.txt");
+		patterns = DependencyPatternParser.parse(depPatternsIS);
+		focusPatterns = DependencyPatternParser.parse(focusPatternsIS);
 	}
 	
 	/**

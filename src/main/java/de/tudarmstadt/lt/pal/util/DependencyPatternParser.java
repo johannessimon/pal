@@ -1,9 +1,9 @@
 package de.tudarmstadt.lt.pal.util;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
@@ -114,10 +114,10 @@ public class DependencyPatternParser {
 		}
 	}
 	
-	public static Collection<DependencyPattern> parse(File file) {
+	public static Collection<DependencyPattern> parse(InputStream is) {
 		List<DependencyPattern> res = new LinkedList<>();
 		try {
-			BufferedReader reader = new BufferedReader(new FileReader(file));
+			BufferedReader reader = new BufferedReader(new InputStreamReader(is));
 			String line;
 			int lineNo = 1;
 			while ((line = reader.readLine()) != null) {
