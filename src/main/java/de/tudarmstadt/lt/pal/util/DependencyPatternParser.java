@@ -82,9 +82,21 @@ public class DependencyPatternParser {
 		public String specific;
 		
 		public boolean matches(GrammaticalRelation rel) {
-			return rel.getShortName().matches(name) &&
-				   (specific == null || rel.getSpecific().matches(specific));
+			return matchesRelName(rel, name) &&
+				   (specific == null || rel.getSpecific() != null && rel.getSpecific().matches(specific));
 		}
+	}
+	
+	/**
+	 * Use hierarchy of dependency types to match names
+	 */
+	static boolean matchesRelName(GrammaticalRelation rel, String namePattern) {
+		if (rel == null) {
+			return false;
+		} else if (rel.getShortName().matches(namePattern)) {
+			return true;
+		}
+		return matchesRelName(rel.getParent(), namePattern);
 	}
 	
 	/**

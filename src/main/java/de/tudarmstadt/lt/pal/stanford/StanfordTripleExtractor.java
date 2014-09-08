@@ -35,7 +35,7 @@ public class StanfordTripleExtractor {
 		triples = new HashSet<>();
 //		varConstraints = new HashMap<>();
 		IndexedWord root = deps.getFirstRoot();
-		handleNode(root);
+		handleNode(root, 0);
 		return triples;
 	}
 	
@@ -46,13 +46,16 @@ public class StanfordTripleExtractor {
 	
 	public IndexedWord getFocusWord() { return focusWord; }
 	
+	// prevent possible infinite loops
+	private final static int MAX_NODE_DEPTH = 10;
+	
 	/**
 	 * Recursively collect triples over dependency graph
 	 */
-	private StanfordTriple handleNode(IndexedWord node) {
+	private StanfordTriple handleNode(IndexedWord node, int depth) {
 		Collection<IndexedWord> children = deps.getChildren(node);
-		// we have a leaf!
-		if (children.isEmpty()) {
+		// we have a leaf! (or have a reached the maximum depth)
+		if (children.isEmpty() || depth > MAX_NODE_DEPTH) {
 			return null;
 		}
 		
@@ -60,7 +63,7 @@ public class StanfordTripleExtractor {
 		IndexedWord predicate = null;
 		IndexedWord object = null;
 		for (IndexedWord child : children) {
-			StanfordTriple childT = handleNode(child);
+			StanfordTriple childT = handleNode(child, depth + 1);
 			
 			// If a dependency implies a semantic constraint but does not
 			// specify either subject or object, then this is determined by
