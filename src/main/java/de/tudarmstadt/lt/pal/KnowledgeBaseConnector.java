@@ -343,7 +343,6 @@ public class KnowledgeBaseConnector {
 		if (types == null) {
 			types = new HashSet<>();
 			uriTypes.put(uri, types);
-			System.out.println(System.identityHashCode(uriTypes) + " " + uriTypes.size());
 			QueryExecution qexec;
 			ResultSet typeResults;
 			qexec = getQueryExec("SELECT ?t WHERE { <" + uri + "> a ?t }");
@@ -353,8 +352,6 @@ public class KnowledgeBaseConnector {
 				QuerySolution sol = typeResults.next();
 				types.add(sol.getResource("t").getURI());
 			}
-		} else {
-			System.out.println("HIT");
 		}
 		return types;
 	}

@@ -49,7 +49,6 @@ public class StanfordTripleExtractor {
 	private SemanticGraph deps;
 	private IndexedWord focusWord;
 	private Set<StanfordTriple> triples;
-//	private Map<IndexedWord, String> varConstraints;
 	
 	public IndexedWord getFocusWord() { return focusWord; }
 	
