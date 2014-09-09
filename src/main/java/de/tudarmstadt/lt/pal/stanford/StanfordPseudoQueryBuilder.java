@@ -179,7 +179,7 @@ public class StanfordPseudoQueryBuilder {
 		// Proper nouns and predicates are constants
 		if (isPredicate || word.tag().startsWith("NNP")) {
 			String wordStr = getNodeText(deps, word) + getWordTagSuffix(word);
-			return new Constant(wordStr, Constant.Type.Unmapped);
+			return new Constant(wordStr);
 		}
 		
 		return registerVariable(variables, word, deps, null);

@@ -14,7 +14,14 @@ public class Triple implements Cloneable {
 		public String name;
 		public List<String> trace;
 		
+		public abstract boolean isConstant();
+		
 		public String sparqlString() {
+			return name;
+		}
+		
+		@Override
+		public String toString() {
 			return name;
 		}
 
@@ -76,54 +83,12 @@ public class Triple implements Cloneable {
 	}
 	
 	public static class Constant extends Element {
-		public enum Type {
-			/**
-			 * A constant that has not been mapped to an ontology
-			 * (e.g. "author" or "Dan Brown")
-			 **/
-			Mapped,
-			/**
-			 * A constant that has been mapped to an ontology
-			 * (e.g. "dbpedia-owl:author" or "dbpedia:Dan_Brown")
-			 **/
-			Unmapped
-		}
-		
-		public Type type;
-		
-		public Constant(String name, Type type) {
+		public Constant(String name) {
 			this.name = name;
-			this.type = type;
 		}
 		
-		public String toString() {
-			if (type == Type.Mapped) {
-				// dbpedia-owl:Agent vs. <http://dbpedia.org/ontology/Agent>
-				return name.contains(":") ? name : "<" + name + ">";
-			} else /*if (type == ConstantType.UnmappedConstantType)*/ {
-				return "\"" + name + "\"";
-			}
-		}
-
 		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = super.hashCode();
-			result = prime * result + ((type == null) ? 0 : type.hashCode());
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (this == obj)
-				return true;
-			if (!super.equals(obj))
-				return false;
-			if (getClass() != obj.getClass())
-				return false;
-			Constant other = (Constant) obj;
-			if (type != other.type)
-				return false;
+		public boolean isConstant() {
 			return true;
 		}
 	}
@@ -146,43 +111,20 @@ public class Triple implements Cloneable {
 			// A variable name does not have a real derivation trace
 			this.trace = Arrays.asList(name);
 		}
-		/*
-		private Variable(String name, TypeConstraint mappedType) {
-			this.name = name;
-			this.unmappedType = null;
-			this.mappedType = mappedType;
-		}*/
 		
+		@Override
+		public boolean isConstant() {
+			return false;
+		}
+		
+		@Override
 		public String sparqlString() {
 			return "?" + name;
 		}
 
 		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = super.hashCode();
-			result = prime * result + ((unmappedType == null) ? 0 : unmappedType.hashCode());
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (this == obj)
-				return true;
-			if (!super.equals(obj))
-				return false;
-			if (getClass() != obj.getClass())
-				return false;
-			Variable other = (Variable) obj;
-			if (unmappedType != other.unmappedType)
-				return false;
-			return true;
-		}
-
-		@Override
 		public String toString() {
-			return "?" + name + " (" + unmappedType + ", "
-					+ mappedType + ")";
+			return "?" + name + " (" + unmappedType + ", " + mappedType + ")";
 		}
 	}
 	

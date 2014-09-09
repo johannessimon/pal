@@ -147,7 +147,7 @@ public class QALD2XMLParser {
 								} else if (e.equals("[]")) { // Wildcard
 									sparqlElements[k] = null;
 								} else {
-									sparqlElements[k] = new Constant(e, Constant.Type.Unmapped);
+									sparqlElements[k] = new Constant(e);
 								}
 							}
 							Triple sparqlTriple = new Triple(sparqlElements[0], sparqlElements[1], sparqlElements[2]);

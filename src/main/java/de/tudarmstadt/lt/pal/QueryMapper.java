@@ -32,18 +32,13 @@ public class QueryMapper {
 	private Collection<ComparablePair<MappedString, Float>> mapResource(Element e) {
 		List<ComparablePair<MappedString, Float>> candidates = null;
 		
-		if (e instanceof Constant) {
-			Constant c = (Constant)e;
-			if (c.type == Constant.Type.Mapped) {
-				candidates = Collections.singletonList(new ComparablePair<MappedString, Float>(new MappedString(e.name), 1.0f));
-			} else {
-				// Get scores for 100 resource candidates and choose best N
-				int numCandidates = 1000;
-				int numCandidatesFiltered = 3;
-				candidates = kb.getResourceCandidates(e.name, numCandidates);
-				if (candidates.size() > numCandidatesFiltered) {
-					candidates = candidates.subList(0, numCandidatesFiltered);
-				}
+		if (e != null && e.isConstant()) {
+			// Get scores for 100 resource candidates and choose best N
+			int numCandidates = 1000;
+			int numCandidatesFiltered = 3;
+			candidates = kb.getResourceCandidates(e.name, numCandidates);
+			if (candidates.size() > numCandidatesFiltered) {
+				candidates = candidates.subList(0, numCandidatesFiltered);
 			}
 		}
 		return candidates;
@@ -52,23 +47,18 @@ public class QueryMapper {
 	private Collection<ComparablePair<MappedString, Float>> mapProperty(Element p, String subjectURI, String objectURI, TypeConstraint subjectTC, TypeConstraint objectTC) {
 		Map<MappedString, Float> synonyms = new HashMap<>();
 		
-		if (p instanceof Constant) {
-			Constant c = (Constant)p;
-			if (c.type == Constant.Type.Mapped) {
-				return Collections.singleton(new ComparablePair<MappedString, Float>(new MappedString(p.name), 1.0f));
-			} else {
-				String nameLC = p.name.toLowerCase();
-				String pos = null;
-				if (nameLC.contains("#")) {
-					int sepIndex = nameLC.indexOf('#');
-					pos = nameLC.substring(sepIndex + 1);
-					nameLC = nameLC.substring(0, sepIndex);
-					wnc.addSynonyms(synonyms, wnc.getRelatedWords(nameLC, pos));
-				}
-				List<String> trace = new LinkedList<>();
-				trace.add(nameLC);
-				wnc.addSynonym(synonyms, nameLC, trace, 1.0f);
+		if (p != null && p.isConstant()) {
+			String nameLC = p.name.toLowerCase();
+			String pos = null;
+			if (nameLC.contains("#")) {
+				int sepIndex = nameLC.indexOf('#');
+				pos = nameLC.substring(sepIndex + 1);
+				nameLC = nameLC.substring(0, sepIndex);
+				wnc.addSynonyms(synonyms, wnc.getRelatedWords(nameLC, pos));
 			}
+			List<String> trace = new LinkedList<>();
+			trace.add(nameLC);
+			wnc.addSynonym(synonyms, nameLC, trace, 1.0f);
 		}
 		
 		List<ComparablePair<MappedString, Float>> nameCandidates = new LinkedList<>();
@@ -219,9 +209,9 @@ public class QueryMapper {
 					String prop = scoredProp.key.value;
 					float comboScore = scoredSubject.value * scoredProp.value;
 					
-					Constant subjectElement = new Constant(subject.value, Constant.Type.Mapped);
+					Constant subjectElement = new Constant(subject.value);
 					subjectElement.trace = subject.trace;
-					Constant predicateElement = new Constant(prop, Constant.Type.Mapped);
+					Constant predicateElement = new Constant(prop);
 					predicateElement.trace = scoredProp.key.trace;
 					Triple mappedTriple = new Triple(subjectElement, predicateElement, objectVar);
 					res.add(new ComparablePair<Triple, Float>(mappedTriple, comboScore));
@@ -237,9 +227,9 @@ public class QueryMapper {
 					String prop = scoredProp.key.value;
 					float comboScore = scoredObject.value * scoredProp.value;
 					
-					Constant predicateElement = new Constant(prop, Constant.Type.Mapped);
+					Constant predicateElement = new Constant(prop);
 					predicateElement.trace = scoredProp.key.trace;
-					Constant objectElement = new Constant(object.value, Constant.Type.Mapped);
+					Constant objectElement = new Constant(object.value);
 					objectElement.trace = object.trace;
 					Triple mappedTriple = new Triple(subjectVar, predicateElement, objectElement);
 					res.add(new ComparablePair<Triple, Float>(mappedTriple, comboScore));
@@ -251,7 +241,7 @@ public class QueryMapper {
 //			System.out.println("prop candidates: " + propCandidates);
 			for (ComparablePair<MappedString, Float> scoredProp : propCandidates) {
 				String prop = scoredProp.key.value;
-				Constant predicateElement = new Constant(prop, Constant.Type.Mapped);
+				Constant predicateElement = new Constant(prop);
 				predicateElement.trace = scoredProp.key.trace;
 				Triple mappedTriple = new Triple(subjectVar, predicateElement, objectVar);
 				res.add(new ComparablePair<Triple, Float>(mappedTriple, scoredProp.value));
