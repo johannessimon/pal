@@ -1,7 +1,8 @@
-y ? ?	be|have subj *
-? y y	be|have dep *
-y x x	*#n* prep_of *
-y x ?	* prep_of|subj *
-x * y	*#n* prep *
-? x y	* agent|obj|prep *
-? ? y	* mod *
+z ? ?	be|have subj *
+? z z	be|have dep *
+z y y	* prep_of *
+y * z	*#n* prep *
+z y ?	* subj *
+x y z	* agent|obj|prep *
+? y z	* agent|obj|prep *
+? ? z	* mod *

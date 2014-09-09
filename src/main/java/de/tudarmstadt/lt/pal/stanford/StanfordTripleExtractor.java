@@ -55,80 +55,56 @@ public class StanfordTripleExtractor {
 	
 	// prevent possible infinite loops
 	private final static int MAX_NODE_DEPTH = 10;
+	
 	/**
 	 * Recursively collect triples over dependency graph
 	 * @throws DependencyTreeTooDeepException 
 	 */
-	private StanfordTriple handleNode(IndexedWord node, int depth) throws DependencyTreeTooDeepException {
+	private void handleNode(IndexedWord y, int depth) throws DependencyTreeTooDeepException {
 		if (depth > MAX_NODE_DEPTH) {
 			throw new DependencyTreeTooDeepException();
 		}
 		
-		Collection<IndexedWord> children = deps.getChildren(node);
-		// we have a leaf!
-		if (children.isEmpty()) {
-			return null;
-		}
+		Collection<IndexedWord> children = deps.getChildren(y);
 		
+		IndexedWord x = deps.getParent(y);
 		IndexedWord subject = null;
 		IndexedWord predicate = null;
 		IndexedWord object = null;
-		for (IndexedWord child : children) {
-			StanfordTriple childT = handleNode(child, depth + 1);
+		for (IndexedWord z : children) {
+			handleNode(z, depth + 1);
 			
-			// If a dependency implies a semantic constraint but does not
-			// specify either subject or object, then this is determined by
-			// the head of the parent dependency
-			// Example 1: agent(written, Pamuk) specifies "[?] written by Pamuk",
-			//            leaving out the subject. In this case we can use the
-			//            parent relation vmod(books, written) to tell ? is "books".
-			// Example 2: prep_from(author, Turkey) specifies "author from Turkey",
-			//            i.e. both subject and object
-			if (childT != null && childT.predicate != null) {
-				if (childT.object == null) {
-					childT.object = node;
-				} else if (childT.subject == null) {
-					childT.subject = node;
-				}
-				// Now the triple is complete
-				triples.add(childT);
-			}
-			
-			if (ignoreWord(node) || ignoreWord(child)) {
+			if (ignoreWord(y) || ignoreWord(z)) {
 				continue;
 			}
 			
-			SemanticGraphEdge edge = deps.getAllEdges(node, child).get(0);
+			SemanticGraphEdge edge = deps.getAllEdges(y, z).get(0);
 			GrammaticalRelation rel = edge.getRelation();
 			
 			for (DependencyPattern depPattern : patterns) {
-				if (depPattern.matches(node, rel, child)) {
-					subject = depPattern.mapTripleElement(subject, depPattern.subjectMapping, node, rel, child);
-					predicate = depPattern.mapTripleElement(predicate, depPattern.predicateMapping, node, rel, child);
-					object = depPattern.mapTripleElement(object, depPattern.objectMapping, node, rel, child);
+				if (depPattern.matches(rel, x, y, z)) {
+					subject = depPattern.mapTripleElement(subject, depPattern.subjectMapping, rel, x, y, z);
+					predicate = depPattern.mapTripleElement(predicate, depPattern.predicateMapping, rel, x, y, z);
+					object = depPattern.mapTripleElement(object, depPattern.objectMapping, rel, x, y, z);
 					break;
 				}
 			}
 			
 			for (DependencyPattern focusPattern : focusPatterns) {
-				if (focusPattern.matches(node, rel, child)) {
-					focusWord = focusPattern.mapTripleElement(null, focusPattern.subjectMapping, node, rel, child);
+				if (focusPattern.matches(rel, x, y, z)) {
+					focusWord = focusPattern.mapTripleElement(null, focusPattern.subjectMapping, rel, x, y, z);
 					break;
 				}
 			}
 		}
 
-		StanfordTriple triple = new StanfordTriple(subject, predicate, object);
 		// There must be at least a subject and an object (no matter if variable or constant),
 		// however the predicate may be a wildcard, i.e. null.
 		// Wildcard predicates will later be replaced by a specific predicate, e.g.
 		// the most common predicate between the subject and the object.
 		if (subject != null && object != null) {
-			triples.add(triple);
-		} //else {
-//			return null;
-//		}
-		return triple;
+			triples.add(new StanfordTriple(subject, predicate, object));
+		}
 	}
 	
 	private boolean ignoreWord(IndexedWord word) {

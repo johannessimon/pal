@@ -13,9 +13,9 @@ import edu.stanford.nlp.trees.GrammaticalRelation;
 
 public class DependencyPatternParser {
 	public static class DependencyPattern {
-		Collection<DependencyNodePattern> parentPatterns;
+		Collection<DependencyNodePattern> yPatterns;
 		Collection<DependencyRelPattern> relPatterns;
-		Collection<DependencyNodePattern> childPatterns;
+		Collection<DependencyNodePattern> zPatterns;
 		
 		public TripleElementMapping subjectMapping;
 		public TripleElementMapping predicateMapping;
@@ -26,13 +26,19 @@ public class DependencyPatternParser {
 		@Override
 		public String toString() { return "#" + sourceLine; }
 		
-		public boolean matches(IndexedWord parent, GrammaticalRelation rel, IndexedWord child) {
-			boolean parentMatches = false;
+		public boolean matches(GrammaticalRelation rel, IndexedWord x, IndexedWord y, IndexedWord z) {
+			// x can be null, match only if it is either not used or not null
+			if (subjectMapping.equals(TripleElementMapping.X) && x == null ||
+				predicateMapping != null && predicateMapping.equals(TripleElementMapping.X) && x == null ||
+				objectMapping != null && objectMapping.equals(TripleElementMapping.X) && x == null ) {
+				return false;
+			}
+			boolean yMatches = false;
 			boolean relMatches = false;
-			boolean childMatches = false;
-			for (DependencyNodePattern p : parentPatterns) {
-				if (p.matches(parent)) {
-					parentMatches = true;
+			boolean zMatches = false;
+			for (DependencyNodePattern p : yPatterns) {
+				if (p.matches(y)) {
+					yMatches = true;
 					break;
 				}
 			}
@@ -42,21 +48,23 @@ public class DependencyPatternParser {
 					break;
 				}
 			}
-			for (DependencyNodePattern p : childPatterns) {
-				if (p.matches(child)) {
-					childMatches = true;
+			for (DependencyNodePattern p : zPatterns) {
+				if (p.matches(z)) {
+					zMatches = true;
 					break;
 				}
 			}
-			return parentMatches && relMatches && childMatches;
+			return yMatches && relMatches && zMatches;
 		}
 		
-		public IndexedWord mapTripleElement(IndexedWord e, TripleElementMapping m, IndexedWord parent, GrammaticalRelation rel, IndexedWord child) {
+		public IndexedWord mapTripleElement(IndexedWord e, TripleElementMapping m, GrammaticalRelation rel, IndexedWord x, IndexedWord y, IndexedWord z) {
 			switch (m) {
-			case DependencyChild:
-				return child;
-			case DependencyParent:
-				return parent;
+			case X:
+				return x;
+			case Y:
+				return y;
+			case Z:
+				return z;
 			case Open:
 				return e; // do not modify
 			default: // case Wildcard:
@@ -66,8 +74,9 @@ public class DependencyPatternParser {
 	}
 	
 	public static enum TripleElementMapping {
-		DependencyParent, // "x"
-		DependencyChild, // "y"
+		X, // "x"
+		Y, // "y"
+		Z, // "y"
 		Wildcard, // "*"
 		Open // "?"
 	}
@@ -139,9 +148,9 @@ public class DependencyPatternParser {
 		String[] depPattern = lineParts[1].split(" ");
 		
 		DependencyPattern res = new DependencyPattern();
-		res.parentPatterns = mapDependencyNodePattern(depPattern[0]);
+		res.yPatterns = mapDependencyNodePattern(depPattern[0]);
 		res.relPatterns = mapDependencyRelPattern(depPattern[1]);
-		res.childPatterns = mapDependencyNodePattern(depPattern[2]);
+		res.zPatterns = mapDependencyNodePattern(depPattern[2]);
 		
 		res.subjectMapping = mapTripleElementMapping(triplePattern[0]);
 		if (triplePattern.length > 1) {
@@ -184,13 +193,16 @@ public class DependencyPatternParser {
 	
 	static TripleElementMapping mapTripleElementMapping(String s) {
 		if (s.equals("x")) {
-			return TripleElementMapping.DependencyParent;
+			return TripleElementMapping.X;
 		} else if (s.equals("y")) {
-			return TripleElementMapping.DependencyChild;
+			return TripleElementMapping.Y;
+		} else if (s.equals("z")) {
+			return TripleElementMapping.Z;
 		} else if (s.equals("*")) {
 			return TripleElementMapping.Wildcard;
-		} else {
+		} else if (s.equals("?")) {
 			return TripleElementMapping.Open;
 		}
+		return null;
 	}
 }
