@@ -53,7 +53,7 @@ public class NLI {
 	}
 	
 	public Collection<Answer> run(String text) {
-		List<Answer> answers = new LinkedList<>();
+		List<Answer> answers = new LinkedList<Answer>();
 		SemanticGraph dependencies = depParser.parse(text);
 		Query pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
 		System.out.println("PSEUDO QUERY: " + pseudoQuery);

@@ -102,10 +102,10 @@ public class WordNetConnector {
 	}
 	
 	public Map<MappedString, Float> getSynonymsAndHypernyms(String word, String posStr) {
-		Map<MappedString, Float> synonymScores = new HashMap<>();
+		Map<MappedString, Float> synonymScores = new HashMap<MappedString, Float>();
 		POS pos = posFromString(posStr);
 		if (pos == null) {
-			return new HashMap<>();
+			return new HashMap<MappedString, Float>();
 		}
 		Collection<ComparablePair<String, Float>> partialWords = StringUtil.getPartialMainWords(word);
 		for (ComparablePair<String, Float> partialWord : partialWords) {
@@ -113,7 +113,7 @@ public class WordNetConnector {
 			if (idxWord == null) {
 				continue;
 			}
-			List<String> trace = new LinkedList<>();
+			List<String> trace = new LinkedList<String>();
 			trace.add(word);
 			if (!partialWord.key.equals(word)) {
 				trace.add(idxWord.getLemma() + " (partial word)");
@@ -132,10 +132,10 @@ public class WordNetConnector {
 	}
 	
 	public Map<MappedString, Float> getRelatedWords(String word, String posStr) {
-		Map<MappedString, Float> synonymScores = new HashMap<>();
+		Map<MappedString, Float> synonymScores = new HashMap<MappedString, Float>();
 		POS pos = posFromString(posStr);
 		if (pos == null) {
-			return new HashMap<>();
+			return new HashMap<MappedString, Float>();
 		}
 		List<String> trace = Arrays.asList(word);
 		Collection<ComparablePair<String, Float>> partialWords = StringUtil.getPartialMainWords(word);
@@ -151,7 +151,7 @@ public class WordNetConnector {
 			float hypernymPenalty = 0.1f;
 			for (IWordID wordID : idxWord.getWordIDs()) {
 				IWord w = dict.getWord(wordID);
-				List<String> _trace = new LinkedList<>(trace);
+				List<String> _trace = new LinkedList<String>(trace);
 				// only add "partial node" notice if it actually is only a part
 				if (!w.getLemma().equals(word)) {
 					_trace.add(w.getLemma() + " (partial word)");
@@ -165,7 +165,7 @@ public class WordNetConnector {
 				List<IWordID> rWordIDs = w.getRelatedWords(Pointer.DERIVATIONALLY_RELATED);
 				for (IWordID rWordID : rWordIDs) {
 					IWord rW = dict.getWord(rWordID);
-					List<String> __trace = new LinkedList<>(_trace);
+					List<String> __trace = new LinkedList<String>(_trace);
 					__trace.add(rW.getLemma() + " (related form)");
 					addSynonym(synonymScores, rW.getLemma(), __trace, factor);
 					addSynonyms(synonymScores, getHyponyms(rW.getSynset(), 3, __trace), factor);
@@ -181,7 +181,7 @@ public class WordNetConnector {
 	}
 	
 	public Map<MappedString, Float> getSynonyms(IWord word, int depth, int maxDepth, List<String> trace) {
-		Map<MappedString, Float> res = new HashMap<>();
+		Map<MappedString, Float> res = new HashMap<MappedString, Float>();
 		if (depth > maxDepth) {
 			return res;
 		}
@@ -190,7 +190,7 @@ public class WordNetConnector {
 			ISynset s = dict.getWord(sameWordInOtherSynset).getSynset();
 			for (IWord synonym : s.getWords()) {
 				float score = 1.0f - (float)depth / (maxDepth + 1);
-				List<String> _trace = new LinkedList<>(trace);
+				List<String> _trace = new LinkedList<String>(trace);
 				// we don't have to mention that a word is a synonym of itself
 				if (!word.getLemma().equals(synonym.getLemma())) {
 					_trace.add(synonym.getLemma() + " (synonym)");
@@ -218,19 +218,19 @@ public class WordNetConnector {
 		if (assignDepthPenalty) {
 			scoreInThisDepth -= (float)depth / maxDepth;
 		}
-		Map<MappedString, Float> res = new HashMap<>();
+		Map<MappedString, Float> res = new HashMap<MappedString, Float>();
 //		Map foo = word.getRelatedMap();
 		List<ISynsetID> sIDs = s.getRelatedSynsets(relationType);
 		for (ISynsetID sID : sIDs) {
 			ISynset hS = dict.getSynset(sID);
-			List<String> _trace = new LinkedList<>(trace);
+			List<String> _trace = new LinkedList<String>(trace);
 			_trace.add(hS.getGloss() + " (" + relationType.getName() + ")");
 			for (IWord h : hS.getWords()) {
 //				if (h.getLemma().equals("bridge")) {
 //					System.out.println("stop");
 //				}
 
-				List<String> __trace = new LinkedList<>(trace);
+				List<String> __trace = new LinkedList<String>(trace);
 				__trace.add(h.getLemma() + " (" + relationType.getName() + ")");
 				addSynonym(res, h.getLemma(), __trace, scoreInThisDepth);
 			}

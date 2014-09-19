@@ -46,7 +46,7 @@ public class QueryMapper {
 	}
 	
 	private Collection<ComparablePair<MappedString, Float>> mapProperty(Element p, String subjectURI, String objectURI, TypeConstraint subjectTC, TypeConstraint objectTC) {
-		Map<MappedString, Float> synonyms = new HashMap<>();
+		Map<MappedString, Float> synonyms = new HashMap<MappedString, Float>();
 		
 		if (p != null && p.isConstant()) {
 			String nameLC = p.name.toLowerCase();
@@ -57,14 +57,14 @@ public class QueryMapper {
 				nameLC = nameLC.substring(0, sepIndex);
 				wnc.addSynonyms(synonyms, wnc.getRelatedWords(nameLC, pos));
 			}
-			List<String> trace = new LinkedList<>();
+			List<String> trace = new LinkedList<String>();
 			trace.add(nameLC);
 			wnc.addSynonym(synonyms, nameLC, trace, 1.0f);
 		}
 		
-		List<ComparablePair<MappedString, Float>> nameCandidates = new LinkedList<>();
+		List<ComparablePair<MappedString, Float>> nameCandidates = new LinkedList<ComparablePair<MappedString, Float>>();
 		for (Entry<MappedString, Float> entry : synonyms.entrySet()) {
-			nameCandidates.add(new ComparablePair<>(entry.getKey(), entry.getValue()));
+			nameCandidates.add(new ComparablePair<MappedString, Float>(entry.getKey(), entry.getValue()));
 		}
 		Collections.sort(nameCandidates);
 		
@@ -75,7 +75,7 @@ public class QueryMapper {
 		TypeConstraint.BasicType basicType = null;
 		MappedString typeURI = null;
 		float score = 1.0f;
-		List<String> derivedTypeTrace = new LinkedList<>();
+		List<String> derivedTypeTrace = new LinkedList<String>();
 		derivedTypeTrace.add(var.name);
 		switch (var.unmappedType) {
 		case Agent:
@@ -105,7 +105,7 @@ public class QueryMapper {
 		case Unknown:
 			String varProperty = var.name.replaceAll("_", " ");
 			Map<MappedString, Float> nameCandidates = wnc.getSynonymsAndHypernyms(varProperty, "n");
-			Set<ComparablePair<MappedString, Float>> nameCandidateSet = new HashSet<>();
+			Set<ComparablePair<MappedString, Float>> nameCandidateSet = new HashSet<ComparablePair<MappedString, Float>>();
 			nameCandidateSet.add(new ComparablePair<MappedString, Float>(new MappedString(var.name), 1.0f));
 			// This value can be anything < 1.0f so that the original term is preferred
 			float synonymPenalty = 0.9f;
@@ -117,8 +117,7 @@ public class QueryMapper {
 				ComparablePair<MappedString, Float> first = typeCandidates.iterator().next();
 				score = first.value;
 				MappedString r = first.key;
-				Set<String> typeClasses = kb.getResourceTypes(r.value);
-				if (typeClasses.contains(KnowledgeBaseConnector.OWL_CLASS_URI)) {
+				if (kb.resourceIsClass(r.value)) {
 					basicType = TypeConstraint.BasicType.Resource;
 				}
 				typeURI = r;
@@ -160,7 +159,7 @@ public class QueryMapper {
 			}
 		}
 		
-		List<ComparablePair<Query, Float>> queryCandidates = new LinkedList<>();
+		List<ComparablePair<Query, Float>> queryCandidates = new LinkedList<ComparablePair<Query, Float>>();
 		if (typeConstraintScore > NO_TYPE_CONSTRAINT_PENALTY) {
 			queryCandidates.addAll(_buildSPARQLQuery(new ComparablePair<Query, Float>(pseudoQueryWithTC, typeConstraintScore)));
 		}
@@ -174,16 +173,16 @@ public class QueryMapper {
 		Query pseudoQuery = scoredPseudoQuery.key;
 //		System.out.println("Building sparql query for pseudo query:");
 //		System.out.println(pseudoQuery);
-		List<ComparablePair<Query, Float>> queryCandidates = new LinkedList<>();
+		List<ComparablePair<Query, Float>> queryCandidates = new LinkedList<ComparablePair<Query, Float>>();
 		Query _baseQuery = (Query)pseudoQuery.clone();
 		_baseQuery.triples.clear();
 		// Add an empty "seed" query
 		queryCandidates.add(new ComparablePair<Query, Float>(_baseQuery, scoredPseudoQuery.value));
 		
 		for (Triple t : pseudoQuery.triples) {
-			List<ComparablePair<Query, Float>> updatedQueryCandidates = new LinkedList<>();
+			List<ComparablePair<Query, Float>> updatedQueryCandidates = new LinkedList<ComparablePair<Query, Float>>();
 			for (ComparablePair<Query, Float> baseQuery : queryCandidates) {
-				List<ComparablePair<Triple, Float>> tripleQueryCandidates = new LinkedList<>();
+				List<ComparablePair<Triple, Float>> tripleQueryCandidates = new LinkedList<ComparablePair<Triple, Float>>();
 				Triple tSwapped = new Triple(t.object, t.predicate, t.subject);
 				tripleQueryCandidates.addAll(buildSPARQLTriple(t, pseudoQuery));
 				tripleQueryCandidates.addAll(buildSPARQLTriple(tSwapped, pseudoQuery));
@@ -204,7 +203,7 @@ public class QueryMapper {
 	}
 	
 	List<ComparablePair<Triple, Float>> buildSPARQLTriple(Triple triple, Query query) {
-		List<ComparablePair<Triple, Float>> res = new LinkedList<>();
+		List<ComparablePair<Triple, Float>> res = new LinkedList<ComparablePair<Triple, Float>>();
 
 		// Try at least N resources (or more if the first N resources do not yield any property matches)
 		int minNumResourcesToTry = 3;

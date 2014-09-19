@@ -77,7 +77,7 @@ public class StringUtil {
 	 * "official web site" -> "official web site", "web site", "site"
 	 */
 	public static Collection<ComparablePair<String, Float>> getPartialMainWords(String word) {
-		List<ComparablePair<String, Float>> res = new LinkedList<>();
+		List<ComparablePair<String, Float>> res = new LinkedList<ComparablePair<String, Float>>();
 		String[] tokens = word.split(" ");
 		for (int i = tokens.length - 1; i >= 0; i--) {
 			String partialWord = "";

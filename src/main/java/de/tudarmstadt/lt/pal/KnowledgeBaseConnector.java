@@ -3,7 +3,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -27,6 +26,7 @@ import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.sparql.engine.http.QueryEngineHTTP;
 
+import de.tudarmstadt.lt.pal.KnowledgeBaseConnector.Answer.DataType;
 import de.tudarmstadt.lt.pal.Triple.TypeConstraint;
 import de.tudarmstadt.lt.pal.Triple.TypeConstraint.BasicType;
 import de.tudarmstadt.lt.pal.Triple.Variable;
@@ -48,8 +48,8 @@ public class KnowledgeBaseConnector {
 		return !localName.matches(invalidPattern);
 	}
 	
-	public final static String OWL_CLASS_URI = "http://www.w3.org/2002/07/owl#Class";
-	public final static String OWL_OBJECT_PROPERTY_URI = "http://www.w3.org/2002/07/owl#ObjectProperty";
+//	public final static String OWL_CLASS_URI = "http://www.w3.org/2002/07/owl#Class";
+//	public final static String OWL_OBJECT_PROPERTY_URI = "http://www.w3.org/2002/07/owl#ObjectProperty";
 	
 	/**
 	 * Returns a short representation of the resource's URI using
@@ -80,7 +80,7 @@ public class KnowledgeBaseConnector {
 	/**
 	 * Maps namespace -> prefix
 	 */
-	Map<String, String> namespacePrefixes = new HashMap<>();
+	Map<String, String> namespacePrefixes = new HashMap<String, String>();
 	
 	private void fillNamespacePrefixes() {
 		namespacePrefixes.put("http://dbpedia.org/ontology/", "dbpedia-owl");
@@ -93,6 +93,8 @@ public class KnowledgeBaseConnector {
 		namespacePrefixes.put("http://www.w3.org/2000/01/rdf-schema#", "rdfs");
 		namespacePrefixes.put("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf");
 		namespacePrefixes.put("http://jena.apache.org/text#", "text");
+		namespacePrefixes.put("http://purl.org/ontology/bibo/", "bibo");
+		namespacePrefixes.put("http://purl.org/ontology/mo/", "mo");
 	}
 	
 	private String getNamespacePrefixDeclarations(String query) {
@@ -156,11 +158,12 @@ public class KnowledgeBaseConnector {
 	private void init() {
 		fillNamespacePrefixes();
 		retrieveClassesInUse();
+		retrieveObjectProperties();
 		fillDataTypeMappings();
 	}
 	
 	private void fillDataTypeMappings() {
-		dataTypeMappings = new HashMap<>();
+		dataTypeMappings = new HashMap<String, DataType>();
 		dataTypeMappings.put(null, Answer.DataType.String); // "pure" literals (no xsd:string)
 		dataTypeMappings.put("http://www.w3.org/2001/XMLSchema#string", Answer.DataType.String);
 		dataTypeMappings.put("http://www.w3.org/2001/XMLSchema#date", Answer.DataType.Date);
@@ -209,23 +212,73 @@ public class KnowledgeBaseConnector {
 		return formattedName.toString();
 	}
 	
-//	Map<Resource, Collection<String>> classesInUse;
-	Collection<Resource> classesInUse;
+	Set<String> objectProperties;
+	private void retrieveObjectProperties() {
+		objectProperties = new HashSet<String>();
+		String query = "SELECT DISTINCT ?t WHERE { ?t a owl:ObjectProperty }";
+		try {
+			QueryExecution qexec = getQueryExec(query);
+			ResultSet results = qexec.execSelect();
+			while (results.hasNext()) {
+				QuerySolution sol = results.next();
+				Resource objectProperty = sol.getResource("?t");
+				objectProperties.add(objectProperty.getURI());
+			}
+			qexec.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	// type -> number of entities with this type
+	Map<Resource, Integer> classesInUse;
+	Set<String> classesInUseSet;
 	private void retrieveClassesInUse() {
-		classesInUse = new ArrayList<>();
-		String query = "SELECT DISTINCT ?t WHERE { [] a ?t }";
+		classesInUseSet = new HashSet<String>();
+		classesInUse = new HashMap<Resource, Integer>();
+//		String query = "SELECT DISTINCT ?t (COUNT(?s) AS ?count) WHERE {?s a ?t} GROUP BY ?t";
+		String query = "SELECT DISTINCT ?t WHERE {?s a ?t}";
 		try {
 			QueryExecution qexec = getQueryExec(query);
 			ResultSet results = qexec.execSelect();
 			while (results.hasNext()) {
 				QuerySolution sol = results.next();
 				Resource classResource = sol.getResource("?t");
-				classesInUse.add(classResource);
+//				int count = sol.getLiteral("?count").getInt();
+				classesInUse.put(classResource, null);
+				classesInUseSet.add(classResource.getURI());
 			}
 			qexec.close();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+	
+	private int getClassCount(Resource classResource) {
+		Integer count = classesInUse.get(classResource);
+		if (count == null) {
+			String query = "SELECT DISTINCT (COUNT(?s) AS ?count) WHERE {?s a <" + classResource.getURI() + ">}";
+			try {
+				QueryExecution qexec = getQueryExec(query);
+				ResultSet results = qexec.execSelect();
+				while (results.hasNext()) {
+					QuerySolution sol = results.next();
+					count = sol.getLiteral("?count").getInt();
+					classesInUse.put(classResource, count);
+				}
+				qexec.close();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		if (count == null) {
+			count = 0;
+		}
+		return count;
+	}
+	
+	public boolean resourceIsClass(String uri) {
+		return classesInUseSet.contains(uri);
 	}
 	
 	/*
@@ -255,22 +308,23 @@ public class KnowledgeBaseConnector {
 	}*/
 	
 	List<ComparablePair<MappedString, Float>> getTypeCandidates(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
-		List<ComparablePair<MappedString, Float>> types = new LinkedList<>();
+		List<ComparablePair<MappedString, Float>> types = new LinkedList<ComparablePair<MappedString, Float>>();
 		for (ComparablePair<MappedString, Float> c : nameCandidates) {
 			String name = formatResourceName(c.key.value);
 //			for (Entry<Resource, Collection<String>> typeEntry : classesInUse.entrySet()) {
-			for (Resource type : classesInUse) {
+			for (Resource type : classesInUse.keySet()) {
 //				List<ComparablePair<MappedString, Float>> _thisTypeScores = new LinkedList<>();
 //				Resource type = typeEntry.getKey();
 //				Collection<String> labels = typeEntry.getValue();
 				String typeName = formatResourceName(type.getLocalName());
 				if (StringUtil.hasPart(typeName, name)) {
-					float score = name.length() / (float)typeName.length();
-					List<String> trace = new LinkedList<>(c.key.trace);
+					int typeCount = getClassCount(type);
+					float score = c.value * name.length() / (float)typeName.length() + 0.01f * (float)Math.log(typeCount);
+					List<String> trace = new LinkedList<String>(c.key.trace);
 					trace.add(getSPARQLResourceString(type.getURI()) + " (URI match)");
 					MappedString mappedType = new MappedString(type.getURI(), trace);
 //					_thisTypeScores.add(new ComparablePair<>(mappedType, c.value * score));
-					types.add(new ComparablePair<>(mappedType, c.value * score));
+					types.add(new ComparablePair<MappedString, Float>(mappedType, score));
 //					continue;
 				}
 				/*
@@ -330,7 +384,7 @@ public class KnowledgeBaseConnector {
 			int sepIndex = name.indexOf('#');
 			name = name.substring(0, sepIndex);
 		}
-		List<ComparablePair<MappedString, Float>> result = new LinkedList<>();
+		List<ComparablePair<MappedString, Float>> result = new LinkedList<ComparablePair<MappedString, Float>>();
 		{
 			String queryString = "SELECT DISTINCT ?subject ?name WHERE { \n"
 		                       + "  { ?subject foaf:name ?name . " + fillTextIndexSearchPattern(textIndexSearchPattern, "?name", name) + "} UNION\n"
@@ -353,7 +407,7 @@ public class KnowledgeBaseConnector {
 					Resource r = soln.getResource("subject");
 					if (r != null) {
 						String shortUri = getSPARQLResourceString(r.getURI());
-						List<String> trace = new LinkedList<>();
+						List<String> trace = new LinkedList<String>();
 						trace.add(name);
 						float labelScore = (float)StringUtil.longestCommonSubstring(name, rName).length() / rName.length();
 						String rNameFromURI = getResourceName(r.getURI());
@@ -403,7 +457,7 @@ public class KnowledgeBaseConnector {
 	public Collection<Answer> query(Query query) {
 		final int RESULT_LIMIT = 1000;
 		String queryStr = queryToSPARQLWithLabel(query, RESULT_LIMIT);
-		Collection<Answer> res = new LinkedList<>();
+		Collection<Answer> res = new LinkedList<Answer>();
 		
 		try {
 			QueryExecution qexec = getQueryExec(queryStr);
@@ -497,7 +551,7 @@ public class KnowledgeBaseConnector {
 	 * one variable)
 	 */
 	public Collection<String> query(String queryString, Set<String> varsToIgnore) {
-		Collection<String> res = new LinkedList<>();
+		Collection<String> res = new LinkedList<String>();
 
 		try {
 			QueryExecution qexec = getQueryExec(queryString);
@@ -535,7 +589,7 @@ public class KnowledgeBaseConnector {
 	 * respect to the focus variable
 	 */
 	public Collection<String> query(String queryString, String focusVariable) {
-		Collection<String> res = new LinkedList<>();
+		Collection<String> res = new LinkedList<String>();
 		
 		// Invalid query check
 		if (queryString == null || queryString.contains("<null>")) {
@@ -575,11 +629,11 @@ public class KnowledgeBaseConnector {
 		return res;
 	}
 	
-	private static Map<String, Set<String>> uriTypes = new HashMap<>();
+	private static Map<String, Set<String>> uriTypes = new HashMap<String, Set<String>>();
 	synchronized Set<String> getResourceTypes(String uri) {
 		Set<String> types = uriTypes.get(uri);
 		if (types == null) {
-			types = new HashSet<>();
+			types = new HashSet<String>();
 			uriTypes.put(uri, types);
 			QueryExecution qexec;
 			ResultSet typeResults;
@@ -631,7 +685,7 @@ public class KnowledgeBaseConnector {
 		boolean objectHasClassConstraint = objectTC != null && objectTC.basicType == BasicType.Resource;
 		// This doesn't make much sense (we need at least one constraint, otherwise we'll query the entire DB)
 		if (subjectURI == null && objectURI == null && !subjectHasClassConstraint && !objectHasClassConstraint) {
-			return new LinkedList<>();
+			return new LinkedList<ComparablePair<MappedString, Float>>();
 		}
 		String querySubject = subjectURI == null ? "?s" : subjectURI;
 		String queryObject = objectURI == null ? "?o" : objectURI;
@@ -658,10 +712,10 @@ public class KnowledgeBaseConnector {
 			propPreCandidates = qexec.execSelect();
 		} catch (Exception e) {
 			System.err.println("Error while executing query: " + query);
-			return new LinkedList<>();
+			return new LinkedList<ComparablePair<MappedString, Float>>();
 		}
 				
-		List<ComparablePair<MappedString, Float>> result = new LinkedList<>();
+		List<ComparablePair<MappedString, Float>> result = new LinkedList<ComparablePair<MappedString, Float>>();
 		while (propPreCandidates.hasNext()) {
 			QuerySolution sol = propPreCandidates.next();
 			Resource pRes = sol.getResource("p");
@@ -679,8 +733,7 @@ public class KnowledgeBaseConnector {
 				// to be scored as high as a typed property with 10 items
 				countScoreBonus = 0.00001f * (float)Math.log(1 + sol.getLiteral("count").getInt());
 			}
-			Set<String> pTypes = getResourceTypes(pUri);
-			boolean pIsObjectProperty = pTypes.contains(OWL_OBJECT_PROPERTY_URI);
+			boolean pIsObjectProperty = objectProperties.contains(pUri);
 			float propertyTypeScore = 1.0f;
 			// We know that the object is a resource, exclude all non-object properties in advance (e.g. DBPedia properties)
 			if (objectURI != null && !pIsObjectProperty) {

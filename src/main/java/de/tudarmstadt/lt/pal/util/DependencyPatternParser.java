@@ -128,7 +128,7 @@ public class DependencyPatternParser {
 	}
 	
 	public static Collection<DependencyPattern> parse(InputStream is) {
-		List<DependencyPattern> res = new LinkedList<>();
+		List<DependencyPattern> res = new LinkedList<DependencyPattern>();
 		try {
 			BufferedReader reader = new BufferedReader(new InputStreamReader(is));
 			String line;
@@ -169,7 +169,7 @@ public class DependencyPatternParser {
 	}
 	
 	static Collection<DependencyNodePattern> mapDependencyNodePattern(String p) {
-		Collection<DependencyNodePattern> res = new LinkedList<>();
+		Collection<DependencyNodePattern> res = new LinkedList<DependencyNodePattern>();
 		String[] orParts = p.split("\\|");
 		for (String orPart : orParts) {
 			DependencyNodePattern pattern = new DependencyNodePattern();
@@ -184,7 +184,7 @@ public class DependencyPatternParser {
 	}
 	
 	static Collection<DependencyRelPattern> mapDependencyRelPattern(String p) {
-		Collection<DependencyRelPattern> res = new LinkedList<>();
+		Collection<DependencyRelPattern> res = new LinkedList<DependencyRelPattern>();
 		String[] orParts = p.split("\\|");
 		for (String orPart : orParts) {
 			DependencyRelPattern pattern = new DependencyRelPattern();

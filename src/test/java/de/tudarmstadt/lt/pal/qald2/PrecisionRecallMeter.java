@@ -23,7 +23,7 @@ public class PrecisionRecallMeter {
 			return;
 		}
 		nonEmptyMeasurements++;
-		Set<String> correctActual = new HashSet<>(actual);
+		Set<String> correctActual = new HashSet<String>(actual);
 		correctActual.retainAll(expected);
 		float _recall = (float)correctActual.size() / expected.size();
 		float _precision = (float)correctActual.size() / actual.size();

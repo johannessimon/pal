@@ -70,7 +70,7 @@ public class QALD2Test {
 	
 	@Test
 	public void test() throws ParseException {
-		Set<String> answers = new HashSet<>();
+		Set<String> answers = new HashSet<String>();
 		SemanticGraph dependencies = depParser.parse(entry.question);
 		Query pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
 		System.out.println(pseudoQuery);
@@ -104,7 +104,7 @@ public class QALD2Test {
 		try {
 			switch (entry.answerType) {
 			case Resource:
-				Set<String> correctAnswers = new HashSet<>(answers);
+				Set<String> correctAnswers = new HashSet<String>(answers);
 				correctAnswers.retainAll(entry.answerResources);
 				recall += (float)correctAnswers.size() / entry.answerResources.size();
 				precision += (float)correctAnswers.size() / answers.size();

@@ -41,8 +41,8 @@ public class StanfordTripleExtractor {
 	public Set<StanfordTriple> extractTriples(SemanticGraph deps) {
 		this.deps = deps;
 		focusWord = null;
-		triples = new HashSet<>();
-		typeConstraints = new HashMap<>();
+		triples = new HashSet<StanfordTriple>();
+		typeConstraints = new HashMap<IndexedWord, IndexedWord>();
 		IndexedWord root = deps.getFirstRoot();
 		try {
 			handleNode(root, 0);

@@ -22,8 +22,8 @@ public class Query {
 	public Variable focusVar = null;
 
 	public Query() {
-		triples = new LinkedList<>();
-		vars = new HashMap<>();
+		triples = new LinkedList<Triple>();
+		vars = new HashMap<String, Variable>();
 	}
 	
 	@Override

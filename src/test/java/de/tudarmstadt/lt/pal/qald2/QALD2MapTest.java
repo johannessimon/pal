@@ -58,7 +58,7 @@ public class QALD2MapTest {
 	
 	@Test
 	public void test() throws ParseException {
-		Set<Answer> answers = new HashSet<>();
+		Set<Answer> answers = new HashSet<Answer>();
 
 		Query query = tripleMapper.getBestSPARQLQuery(entry.pseudoQuery);
 		assertTrue(query != null);

@@ -127,10 +127,10 @@ public class QALD2TestWithoutAnswers {
 		System.out.println("======= ANSWER =======");
 		String focusVar = pseudoQuery.focusVar.name;
 		
-		Set<String> expectedAnswers = new HashSet<>();
+		Set<String> expectedAnswers = new HashSet<String>();
 		
 		if (entry.query != null && !entry.query.contains("OUT OF SCOPE")) {
-			Set<String> varsToIgnore = new HashSet<>();
+			Set<String> varsToIgnore = new HashSet<String>();
 			varsToIgnore.add("string");
 			expectedAnswers.addAll(kb.query(entry.query, varsToIgnore));
 		}
@@ -144,7 +144,7 @@ public class QALD2TestWithoutAnswers {
 			synchronized(datasetElement) {
 				q.addElement("query").addText(kb.queryToSPARQL(query));
 				Element answersElement = q.addElement("answers");
-				Set<String> answerValues = new HashSet<>();
+				Set<String> answerValues = new HashSet<String>();
 				for (Answer a : answers) {
 					answerValues.add(a.value);
 					String dataType = a.dataType.toString().toLowerCase();

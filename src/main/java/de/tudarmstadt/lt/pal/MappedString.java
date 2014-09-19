@@ -5,7 +5,7 @@ import java.util.List;
 
 public class MappedString {
 	public String value;
-	public List<String> trace = new LinkedList<>();
+	public List<String> trace = new LinkedList<String>();
 	
 	public MappedString(String word) {
 		this.value = word;

@@ -21,7 +21,7 @@ import edu.stanford.nlp.semgraph.SemanticGraphEdge;
  */
 public class StanfordPseudoQueryBuilder {
 	StanfordTripleExtractor tripleExtactor = new StanfordTripleExtractor();
-	Set<String> ignoredWords = new HashSet<>();
+	Set<String> ignoredWords = new HashSet<String>();
 	
 	public StanfordPseudoQueryBuilder() {
 		// quantity words (e.g. in "How many films ...")
