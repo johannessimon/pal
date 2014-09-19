@@ -417,61 +417,67 @@ public class KnowledgeBaseConnector {
 		return "(no label)";
 	}
 	
+	Map<String, List<ComparablePair<MappedString, Float>>> resourceCandidateCache = new HashMap<String, List<ComparablePair<MappedString, Float>>>();
+	
 	List<ComparablePair<MappedString, Float>> getResourceCandidates(String name, int limit) {
-		System.out.println("Searching resources... [" + name + "]");
-		if (name.contains("#")) {
-			int sepIndex = name.indexOf('#');
-			name = name.substring(0, sepIndex);
-		}
-		List<ComparablePair<MappedString, Float>> result = new LinkedList<ComparablePair<MappedString, Float>>();
-		{
-			String queryString = "SELECT DISTINCT ?subject ?name WHERE { \n"
-		                       + "  { ?subject foaf:name ?name . " + fillTextIndexSearchPattern(textIndexSearchPattern, "?name", name) + "} UNION\n"
-				               + "  { ?subject rdfs:label ?name . " + fillTextIndexSearchPattern(textIndexSearchPattern, "?name", name) + "} . \n"
-							   // Important: text:query must come first for pre-filtering (otherwise it takes much longer)
-//						       + "  ?subject text:query('" + name + "' " + limit + ") . \n"
-//		                       + "  ?subject a owl:Thing . \n"
-							   + "  { ?subject foaf:name ?name . FILTER(lang(?name) = \"\" || langMatches(lang(?name), \"en\")) }\n"
-                               + "  UNION\n"
-                               + "  { ?subject rdfs:label ?name . FILTER(lang(?name) = \"\" || langMatches(lang(?name), \"en\")) }\n"
-				               + "} \n"
-					           + "LIMIT " + limit;
-			try {
-				QueryExecution qexec = getQueryExec(queryString);
-				ResultSet results = qexec.execSelect();
-				for (; results.hasNext(); )
-				{
-					QuerySolution soln = results.nextSolution();
-					String rName = soln.getLiteral("name").getString();
-					Resource r = soln.getResource("subject");
-					if (r != null) {
-						String shortUri = getSPARQLResourceString(r.getURI());
-						List<String> trace = new LinkedList<String>();
-						trace.add(name);
-						float labelScore = (float)StringUtil.longestCommonSubstring(name, rName).length() / rName.length();
-						String rNameFromURI = getResourceName(r.getURI());
-						float resourceNameScore = (float)StringUtil.longestCommonSubstring(name, rNameFromURI).length() / rNameFromURI.length();
-						float comboScore = labelScore * 0.5f + resourceNameScore * 0.5f;
-						// Assign penalty for inexact matches
-						float inexactMatchPenalty = 0.5f;
-						if (comboScore < 1.0f) {
-							comboScore = comboScore * inexactMatchPenalty;
-							trace.add(shortUri + " (partial match)");
-						} else {
-							trace.add(shortUri + " (exact match)");
-						}
-						result.add(new ComparablePair<MappedString, Float>(new MappedString(shortUri, trace), comboScore));
-					}
-				}
-				qexec.close();
-			} catch (Exception e) {
-				e.printStackTrace();
+		List<ComparablePair<MappedString, Float>> candidates = resourceCandidateCache.get(name);
+		if (candidates == null) {
+			candidates = new LinkedList<ComparablePair<MappedString, Float>>();
+			resourceCandidateCache.put(name, candidates);
+			System.out.println("Searching resources... [" + name + "]");
+			if (name.contains("#")) {
+				int sepIndex = name.indexOf('#');
+				name = name.substring(0, sepIndex);
 			}
+			{
+				String queryString = "SELECT DISTINCT ?subject ?name WHERE { \n"
+			                       + "  { ?subject foaf:name ?name . " + fillTextIndexSearchPattern(textIndexSearchPattern, "?name", name) + "} UNION\n"
+					               + "  { ?subject rdfs:label ?name . " + fillTextIndexSearchPattern(textIndexSearchPattern, "?name", name) + "} . \n"
+								   // Important: text:query must come first for pre-filtering (otherwise it takes much longer)
+	//						       + "  ?subject text:query('" + name + "' " + limit + ") . \n"
+	//		                       + "  ?subject a owl:Thing . \n"
+								   + "  { ?subject foaf:name ?name . FILTER(lang(?name) = \"\" || langMatches(lang(?name), \"en\")) }\n"
+	                               + "  UNION\n"
+	                               + "  { ?subject rdfs:label ?name . FILTER(lang(?name) = \"\" || langMatches(lang(?name), \"en\")) }\n"
+					               + "} \n"
+						           + "LIMIT " + limit;
+				try {
+					QueryExecution qexec = getQueryExec(queryString);
+					ResultSet results = qexec.execSelect();
+					for (; results.hasNext(); )
+					{
+						QuerySolution soln = results.nextSolution();
+						String rName = soln.getLiteral("name").getString();
+						Resource r = soln.getResource("subject");
+						if (r != null) {
+							String shortUri = getSPARQLResourceString(r.getURI());
+							List<String> trace = new LinkedList<String>();
+							trace.add(name);
+							float labelScore = (float)StringUtil.longestCommonSubstring(name, rName).length() / rName.length();
+							String rNameFromURI = getResourceName(r.getURI());
+							float resourceNameScore = (float)StringUtil.longestCommonSubstring(name, rNameFromURI).length() / rNameFromURI.length();
+							float comboScore = labelScore * 0.5f + resourceNameScore * 0.5f;
+							// Assign penalty for inexact matches
+							float inexactMatchPenalty = 0.5f;
+							if (comboScore < 1.0f) {
+								comboScore = comboScore * inexactMatchPenalty;
+								trace.add(shortUri + " (partial match)");
+							} else {
+								trace.add(shortUri + " (exact match)");
+							}
+							candidates.add(new ComparablePair<MappedString, Float>(new MappedString(shortUri, trace), comboScore));
+						}
+					}
+					qexec.close();
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+	
+			Collections.sort(candidates);
+			System.out.println("Done searching resources. Results: " + candidates);
 		}
-
-		Collections.sort(result);
-		System.out.println("Done searching resources. Results: " + result);
-		return result;
+		return candidates;
 	}
 	
 	private static int numQueries = 0;
@@ -715,6 +721,12 @@ public class KnowledgeBaseConnector {
 		return query.toString();
 	}
 	
+	class PropertyCandidate {
+		Resource res;
+		int count;
+	}
+	Map<List<Object>, Collection<PropertyCandidate>> propCandidateCache = new HashMap<List<Object>, Collection<PropertyCandidate>>();
+	
 	/**
 	 * nameCandidates must be sorted in ascending order
 	 */
@@ -726,43 +738,63 @@ public class KnowledgeBaseConnector {
 		if (subjectURI == null && objectURI == null && !subjectHasClassConstraint && !objectHasClassConstraint) {
 			return new LinkedList<ComparablePair<MappedString, Float>>();
 		}
-		String querySubject = subjectURI == null ? "?s" : subjectURI;
-		String queryObject = objectURI == null ? "?o" : objectURI;
-		String query = "SELECT ?p ";
-		// Count number of property "connections" if we have no clue about the property
+		List<Object> cacheKey = Arrays.asList(subjectURI, objectURI, subjectTC, objectTC);
 		boolean useCountScore = true;//nameCandidates == null;// && subjectIsVar ^ objectIsVar;
-		if (useCountScore) {
-			String countVar = subjectURI == null ? "?s" : "?o";
-			query += "(COUNT(" + countVar + ") AS ?count)";
-		}
-		query += " WHERE { ";
-		query += querySubject + " ?p " + queryObject + " . ";
-		query += getTypeConstraintSPARQLString(subjectTC, "s");
-		query += getTypeConstraintSPARQLString(objectTC, "o");
-		query += "}";
-		if (useCountScore) {
-			query += " GROUP BY ?p ORDER BY DESC(?count)";
-		}
-		query += " LIMIT 1000";
-		QueryExecution qexec = null;
-		ResultSet propPreCandidates;
-		try {
-			qexec = getQueryExec(query);
-			propPreCandidates = qexec.execSelect();
-		} catch (Exception e) {
-			System.err.println("Error while executing query: " + query);
-			return new LinkedList<ComparablePair<MappedString, Float>>();
-		}
-				
-		List<ComparablePair<MappedString, Float>> result = new LinkedList<ComparablePair<MappedString, Float>>();
-		while (propPreCandidates.hasNext()) {
-			QuerySolution sol = propPreCandidates.next();
-			Resource pRes = sol.getResource("p");
-			// Probably the result set is empty (but has one null entry with count 0)
-			if (pRes == null) {
-				break;
+		
+		Collection<PropertyCandidate> propCandidates = propCandidateCache.get(cacheKey);
+		if (propCandidates == null) {
+			propCandidates = new LinkedList<PropertyCandidate>();
+			propCandidateCache.put(cacheKey, propCandidates);
+			String querySubject = subjectURI == null ? "?s" : subjectURI;
+			String queryObject = objectURI == null ? "?o" : objectURI;
+			String query = "SELECT ?p ";
+			// Count number of property "connections" if we have no clue about the property
+			if (useCountScore) {
+				String countVar = subjectURI == null ? "?s" : "?o";
+				query += "(COUNT(" + countVar + ") AS ?count)";
 			}
+			query += " WHERE { ";
+			query += querySubject + " ?p " + queryObject + " . ";
+			query += getTypeConstraintSPARQLString(subjectTC, "s");
+			query += getTypeConstraintSPARQLString(objectTC, "o");
+			query += "}";
+			if (useCountScore) {
+				query += " GROUP BY ?p ORDER BY DESC(?count)";
+			}
+			query += " LIMIT 1000";
+			QueryExecution qexec = null;
+			ResultSet propPreCandidates;
+			try {
+				qexec = getQueryExec(query);
+				propPreCandidates = qexec.execSelect();
+			} catch (Exception e) {
+				System.err.println("Error while executing query: " + query);
+				return new LinkedList<ComparablePair<MappedString, Float>>();
+			}
+
+			while (propPreCandidates.hasNext()) {
+				QuerySolution sol = propPreCandidates.next();
+				Resource pRes = sol.getResource("p");
+				// Probably the result set is empty (but has one null entry with count 0)
+				if (pRes == null) {
+					break;
+				}
+				PropertyCandidate pc = new PropertyCandidate();
+				pc.res = pRes;
+				pc.count = sol.getLiteral("count").getInt();
+				propCandidates.add(pc);
+			}
+
+			if (qexec != null) {
+				qexec.close();
+			}
+		}
+
+		List<ComparablePair<MappedString, Float>> result = new LinkedList<ComparablePair<MappedString, Float>>();
+		for (PropertyCandidate pc : propCandidates) {
+			Resource pRes = pc.res;
 			String pUri = pRes.getURI();
+			int count = pc.count;
 			String pUriShortForm = getSPARQLResourceString(pUri);
 			// Assign a very small bonus for higher number of connections
 			// -> should only make a difference for near-tie situations
@@ -770,7 +802,7 @@ public class KnowledgeBaseConnector {
 			if (useCountScore) {
 				// Use logarithm to avoid an untyped property with 100 items
 				// to be scored as high as a typed property with 10 items
-				countScoreBonus = 0.00001f * (float)Math.log(1 + sol.getLiteral("count").getInt());
+				countScoreBonus = 0.00001f * (float)Math.log(1 + count);
 			}
 			boolean pIsObjectProperty = objectProperties.contains(pUri);
 			float propertyTypeScore = 1.0f;
@@ -798,9 +830,6 @@ public class KnowledgeBaseConnector {
 				MappedString mappedPUri = new MappedString(pUriShortForm);
 				result.add(new ComparablePair<MappedString, Float>(mappedPUri, propertyTypeScore + countScoreBonus));
 			}
-		}
-		if (qexec != null) {
-			qexec.close();
 		}
 		Collections.sort(result);
 		int numResults = Math.min(result.size(), 10);
