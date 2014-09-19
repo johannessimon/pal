@@ -70,6 +70,12 @@ public class QALD2XMLParser {
 					qald2Entry.question = questionStringNodes.item(0).getTextContent().trim();
 				}
 				
+				NodeList queryNodes = entryElement.getElementsByTagName("query");
+				if (queryNodes.getLength() > 0) {
+					Node queryNode = queryNodes.item(0);
+					qald2Entry.query = queryNode.getTextContent();
+				}
+				
 				NodeList keywordNodes = entryElement.getElementsByTagName("keywords");
 				if (keywordNodes.getLength() > 0) {
 					Node keywordNode = keywordNodes.item(0);

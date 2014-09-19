@@ -24,12 +24,13 @@ import edu.stanford.nlp.semgraph.SemanticGraph;
 @RunWith(Parameterized.class)
 public class QALD2ParseTest {
 	QALD2Entry entry;
-	KnowledgeBaseConnector kb = new KnowledgeBaseConnector("http://localhost:8890/sparql/");
-	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
-	StanfordDependencyParser depParser = new StanfordDependencyParser("/Users/jsimon/No-Backup/stanford-parser-tmp");
+	KnowledgeBaseConnector kb;
+	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder();
+	StanfordDependencyParser depParser = new StanfordDependencyParser(/*"/Users/jsimon/No-Backup/stanford-parser-tmp"*/);
 	
-	public QALD2ParseTest(String question, QALD2Entry entry) {
+	public QALD2ParseTest(String question, QALD2Entry entry) throws IOException {
 		this.entry = entry;
+		kb = new KnowledgeBaseConnector("src/main/resources/sparql_endpoints/dbpedia-37-local.properties");
 	}
 	
 	@Parameterized.Parameters(name="{0}")
@@ -50,7 +51,6 @@ public class QALD2ParseTest {
 	
 	@Test
 	public void test() throws ParseException {
-		StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
 		SemanticGraph dependencies = depParser.parse(entry.question);
 		Query pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
 		assertEquals(entry.pseudoQuery, pseudoQuery);

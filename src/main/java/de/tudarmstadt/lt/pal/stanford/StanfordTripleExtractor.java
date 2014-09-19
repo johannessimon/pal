@@ -2,7 +2,9 @@ package de.tudarmstadt.lt.pal.stanford;
 
 import java.io.InputStream;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import de.tudarmstadt.lt.pal.util.DependencyPatternParser;
@@ -21,12 +23,16 @@ import edu.stanford.nlp.trees.GrammaticalRelation;
 public class StanfordTripleExtractor {
 	Collection<DependencyPattern> patterns;
 	Collection<DependencyPattern> focusPatterns;
+	Collection<DependencyPattern> typePatterns;
+	Map<IndexedWord, IndexedWord> typeConstraints;
 	
 	public StanfordTripleExtractor() {
 		InputStream depPatternsIS = getClass().getClassLoader().getResourceAsStream("dep_patterns.txt");
 		InputStream focusPatternsIS = getClass().getClassLoader().getResourceAsStream("focus_patterns.txt");
+		InputStream typePatternsIS = getClass().getClassLoader().getResourceAsStream("type_patterns.txt");
 		patterns = DependencyPatternParser.parse(depPatternsIS);
 		focusPatterns = DependencyPatternParser.parse(focusPatternsIS);
+		typePatterns = DependencyPatternParser.parse(typePatternsIS);
 	}
 	
 	/**
@@ -36,7 +42,7 @@ public class StanfordTripleExtractor {
 		this.deps = deps;
 		focusWord = null;
 		triples = new HashSet<>();
-//		varConstraints = new HashMap<>();
+		typeConstraints = new HashMap<>();
 		IndexedWord root = deps.getFirstRoot();
 		try {
 			handleNode(root, 0);
@@ -63,6 +69,10 @@ public class StanfordTripleExtractor {
 		if (depth > MAX_NODE_DEPTH) {
 			throw new DependencyTreeTooDeepException();
 		}
+		if (StanfordUtil.wordIsProperNoun(deps, y)) {
+			// Constant elements are never subject of any triples (only object)
+			return;
+		}
 		
 		Collection<IndexedWord> children = deps.getChildren(y);
 		
@@ -72,7 +82,6 @@ public class StanfordTripleExtractor {
 		IndexedWord object = null;
 		for (IndexedWord z : children) {
 			handleNode(z, depth + 1);
-			
 			if (ignoreWord(y) || ignoreWord(z)) {
 				continue;
 			}
@@ -82,6 +91,9 @@ public class StanfordTripleExtractor {
 			
 			for (DependencyPattern depPattern : patterns) {
 				if (depPattern.matches(rel, x, y, z)) {
+					if (depPattern.isAntiPattern()) {
+						break; // Skips x->y->z triple altogether
+					}
 					subject = depPattern.mapTripleElement(subject, depPattern.subjectMapping, rel, x, y, z);
 					predicate = depPattern.mapTripleElement(predicate, depPattern.predicateMapping, rel, x, y, z);
 					object = depPattern.mapTripleElement(object, depPattern.objectMapping, rel, x, y, z);
@@ -92,6 +104,15 @@ public class StanfordTripleExtractor {
 			for (DependencyPattern focusPattern : focusPatterns) {
 				if (focusPattern.matches(rel, x, y, z)) {
 					focusWord = focusPattern.mapTripleElement(null, focusPattern.subjectMapping, rel, x, y, z);
+					break;
+				}
+			}
+			
+			for (DependencyPattern typePattern : typePatterns) {
+				if (typePattern.matches(rel, x, y, z)) {
+					IndexedWord word = typePattern.mapTripleElement(null, typePattern.subjectMapping, rel, x, y, z);
+					IndexedWord type = typePattern.mapTripleElement(null, typePattern.predicateMapping, rel, x, y, z);
+					typeConstraints.put(word, type);
 					break;
 				}
 			}

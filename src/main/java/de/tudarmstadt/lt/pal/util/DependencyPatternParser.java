@@ -26,6 +26,10 @@ public class DependencyPatternParser {
 		@Override
 		public String toString() { return "#" + sourceLine; }
 		
+		public boolean isAntiPattern() { return subjectMapping == TripleElementMapping.Open &&
+											    predicateMapping == TripleElementMapping.Open &&
+											    objectMapping == TripleElementMapping.Open; }
+		
 		public boolean matches(GrammaticalRelation rel, IndexedWord x, IndexedWord y, IndexedWord z) {
 			// x can be null, match only if it is either not used or not null
 			if (subjectMapping.equals(TripleElementMapping.X) && x == null ||
@@ -143,6 +147,7 @@ public class DependencyPatternParser {
 	}
 	
 	static DependencyPattern parse(String line) {
+		line = line.replaceAll("//.*", "").trim(); // Remove comment
 		String[] lineParts = line.split("\t");
 		String[] triplePattern = lineParts[0].split(" ");
 		String[] depPattern = lineParts[1].split(" ");
@@ -155,6 +160,8 @@ public class DependencyPatternParser {
 		res.subjectMapping = mapTripleElementMapping(triplePattern[0]);
 		if (triplePattern.length > 1) {
 			res.predicateMapping = mapTripleElementMapping(triplePattern[1]);
+		}
+		if (triplePattern.length > 2) {
 			res.objectMapping = mapTripleElementMapping(triplePattern[2]);
 		}
 		

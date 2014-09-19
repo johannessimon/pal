@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import de.tudarmstadt.lt.pal.KnowledgeBaseConnector.Answer;
 import de.tudarmstadt.lt.pal.Triple.Constant;
 import de.tudarmstadt.lt.pal.Triple.Element;
 import de.tudarmstadt.lt.pal.Triple.TypeConstraint;
@@ -35,7 +36,7 @@ public class QueryMapper {
 		if (e != null && e.isConstant()) {
 			// Get scores for 100 resource candidates and choose best N
 			int numCandidates = 1000;
-			int numCandidatesFiltered = 3;
+			int numCandidatesFiltered = 5;
 			candidates = kb.getResourceCandidates(e.name, numCandidates);
 			if (candidates.size() > numCandidatesFiltered) {
 				candidates = candidates.subList(0, numCandidatesFiltered);
@@ -70,9 +71,10 @@ public class QueryMapper {
 		return kb.getPropertyCandidates(nameCandidates, subjectURI, objectURI, subjectTC, objectTC);
 	}
 	
-	private TypeConstraint mapVariableType(Variable var) {
+	private ComparablePair<TypeConstraint, Float> mapVariableType(Variable var) {
 		TypeConstraint.BasicType basicType = null;
 		MappedString typeURI = null;
+		float score = 1.0f;
 		List<String> derivedTypeTrace = new LinkedList<>();
 		derivedTypeTrace.add(var.name);
 		switch (var.unmappedType) {
@@ -91,13 +93,18 @@ public class QueryMapper {
 			derivedTypeTrace.add("xsd:date (\"when\")");
 			typeURI = new MappedString("xsd:date", derivedTypeTrace);
 			break;
+		case Integer:
+			basicType = TypeConstraint.BasicType.Literal;
+			derivedTypeTrace.add("xsd:integer (\"many\")");
+			typeURI = new MappedString("xsd:integer", derivedTypeTrace);
+			break;
 		case Literal:
 			basicType = TypeConstraint.BasicType.Literal;
 			typeURI = null;
 			break;
 		case Unknown:
 			String varProperty = var.name.replaceAll("_", " ");
-			Map<MappedString, Float> nameCandidates = wnc.getSynonyms(varProperty, "n");
+			Map<MappedString, Float> nameCandidates = wnc.getSynonymsAndHypernyms(varProperty, "n");
 			Set<ComparablePair<MappedString, Float>> nameCandidateSet = new HashSet<>();
 			nameCandidateSet.add(new ComparablePair<MappedString, Float>(new MappedString(var.name), 1.0f));
 			// This value can be anything < 1.0f so that the original term is preferred
@@ -107,7 +114,9 @@ public class QueryMapper {
 			}
 			List<ComparablePair<MappedString, Float>> typeCandidates = kb.getTypeCandidates(nameCandidateSet);
 			if (typeCandidates != null && !typeCandidates.isEmpty()) {
-				MappedString r = typeCandidates.iterator().next().key;
+				ComparablePair<MappedString, Float> first = typeCandidates.iterator().next();
+				score = first.value;
+				MappedString r = first.key;
 				Set<String> typeClasses = kb.getResourceTypes(r.value);
 				if (typeClasses.contains(KnowledgeBaseConnector.OWL_CLASS_URI)) {
 					basicType = TypeConstraint.BasicType.Resource;
@@ -116,7 +125,7 @@ public class QueryMapper {
 			}
 		}
 		if (basicType != null) {
-			return new TypeConstraint(basicType, typeURI);
+			return new ComparablePair<TypeConstraint, Float>(new TypeConstraint(basicType, typeURI), score);
 		}
 		return null;
 	}
@@ -126,7 +135,7 @@ public class QueryMapper {
 		for (ComparablePair<Query, Float> query : queryCandidates) {
 			try {
 //				System.out.println("?" + pseudoQuery.focusVar.name + ":");
-				Collection<String> answer = kb.query(query.key);
+				Collection<Answer> answer = kb.query(query.key);
 				if (!answer.isEmpty()) {
 					return query.key;
 				}
@@ -140,32 +149,36 @@ public class QueryMapper {
 	public List<ComparablePair<Query, Float>> buildSPARQLQuery(Query pseudoQuery) {
 		Query pseudoQueryWithTC = (Query)pseudoQuery.clone();
 		Query pseudoQueryWithoutTC = (Query)pseudoQuery.clone();
+		final float NO_TYPE_CONSTRAINT_PENALTY = 0.1f;
+		float typeConstraintScore = 1.0f;
 		for (Variable var : pseudoQueryWithTC.vars.values()) {
-			var.mappedType = mapVariableType(var);
+			ComparablePair<TypeConstraint, Float> tc = mapVariableType(var);
+			// Adding this type would cause the query to be scored lower than an untyped query
+			if (tc != null && tc.value > NO_TYPE_CONSTRAINT_PENALTY) {
+				var.mappedType = tc.key;
+				typeConstraintScore *= tc.value;
+			}
 		}
 		
-		final float NO_TYPE_CONSTRAINT_PENALTY = 0.1f;
 		List<ComparablePair<Query, Float>> queryCandidates = new LinkedList<>();
-		List<ComparablePair<Query, Float>> queryCandidatesWithTC = _buildSPARQLQuery(pseudoQueryWithTC);
-		List<ComparablePair<Query, Float>> queryCandidatesWithoutTC = _buildSPARQLQuery(pseudoQueryWithoutTC);
-		for (ComparablePair<Query, Float> q : queryCandidatesWithoutTC) {
-			q.value *= NO_TYPE_CONSTRAINT_PENALTY;
+		if (typeConstraintScore > NO_TYPE_CONSTRAINT_PENALTY) {
+			queryCandidates.addAll(_buildSPARQLQuery(new ComparablePair<Query, Float>(pseudoQueryWithTC, typeConstraintScore)));
 		}
-		queryCandidates.addAll(queryCandidatesWithTC);
-		queryCandidates.addAll(queryCandidatesWithoutTC);
+		queryCandidates.addAll(_buildSPARQLQuery(new ComparablePair<Query, Float>(pseudoQueryWithoutTC, NO_TYPE_CONSTRAINT_PENALTY)));
 		Collections.sort(queryCandidates);
 		
 		return queryCandidates;
 	}
 	
-	private List<ComparablePair<Query, Float>> _buildSPARQLQuery(Query pseudoQuery) {
+	private List<ComparablePair<Query, Float>> _buildSPARQLQuery(ComparablePair<Query, Float> scoredPseudoQuery) {
+		Query pseudoQuery = scoredPseudoQuery.key;
 //		System.out.println("Building sparql query for pseudo query:");
 //		System.out.println(pseudoQuery);
 		List<ComparablePair<Query, Float>> queryCandidates = new LinkedList<>();
 		Query _baseQuery = (Query)pseudoQuery.clone();
 		_baseQuery.triples.clear();
 		// Add an empty "seed" query
-		queryCandidates.add(new ComparablePair<Query, Float>(_baseQuery, 1.0f));
+		queryCandidates.add(new ComparablePair<Query, Float>(_baseQuery, scoredPseudoQuery.value));
 		
 		for (Triple t : pseudoQuery.triples) {
 			List<ComparablePair<Query, Float>> updatedQueryCandidates = new LinkedList<>();
@@ -193,6 +206,9 @@ public class QueryMapper {
 	List<ComparablePair<Triple, Float>> buildSPARQLTriple(Triple triple, Query query) {
 		List<ComparablePair<Triple, Float>> res = new LinkedList<>();
 
+		// Try at least N resources (or more if the first N resources do not yield any property matches)
+		int minNumResourcesToTry = 3;
+		int numResourcesTried = 0;
 		Collection<ComparablePair<MappedString, Float>> subjectCandidates = mapResource(triple.subject);
 		Collection<ComparablePair<MappedString, Float>> objectCandidates = mapResource(triple.object);
 		Variable subjectVar = (triple.subject instanceof Variable) ? (Variable)triple.subject : null;
@@ -216,6 +232,10 @@ public class QueryMapper {
 					Triple mappedTriple = new Triple(subjectElement, predicateElement, objectVar);
 					res.add(new ComparablePair<Triple, Float>(mappedTriple, comboScore));
 				}
+				numResourcesTried++;
+				if (numResourcesTried >= minNumResourcesToTry && !res.isEmpty()) {
+					break;
+				}
 			}
 		} else if (objectCandidates != null && subjectVar != null) {
 			for (ComparablePair<MappedString, Float> scoredObject : objectCandidates) {
@@ -233,6 +253,10 @@ public class QueryMapper {
 					objectElement.trace = object.trace;
 					Triple mappedTriple = new Triple(subjectVar, predicateElement, objectElement);
 					res.add(new ComparablePair<Triple, Float>(mappedTriple, comboScore));
+				}
+				numResourcesTried++;
+				if (numResourcesTried >= minNumResourcesToTry && !res.isEmpty()) {
+					break;
 				}
 			}
 		// Relations between two variables

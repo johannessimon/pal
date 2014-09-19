@@ -83,6 +83,8 @@ public class Triple implements Cloneable {
 	}
 	
 	public static class Constant extends Element {
+		public String type;
+		
 		public Constant(String name) {
 			this.name = name;
 		}
@@ -98,6 +100,7 @@ public class Triple implements Cloneable {
 			Agent,
 			Date,
 			Place,
+			Integer,
 			Literal,
 			Unknown
 		}

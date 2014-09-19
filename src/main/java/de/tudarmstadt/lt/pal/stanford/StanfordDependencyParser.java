@@ -24,21 +24,33 @@ public class StanfordDependencyParser {
 	StanfordCoreNLP pipeline = null;
 	File tmpDir;
 	
+	public StanfordDependencyParser() {
+		tmpDir = null;
+		props = new Properties();
+//		props.put("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
+		props.put("annotators", "tokenize, ssplit, pos, lemma, parse");
+	}
+	
 	/**
 	 * @param tmpDir Temporary directory for parse tree cache
 	 */
-	public StanfordDependencyParser(String tmpDir) {
+	/*public StanfordDependencyParser(String tmpDir) {
 		this.tmpDir = new File(tmpDir);
 		props = new Properties();
-		props.put("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
-	}
+//		props.put("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
+		props.put("annotators", "tokenize, ssplit, pos, lemma, parse");
+	}*/
 	
 	/**
 	 * Get the file in the cache directory representing a given sentence
 	 */
 	private File getCacheFile(String sentence) {
 		int hash = Math.abs(sentence.hashCode());
-		return new File(tmpDir, Integer.toHexString(hash));
+		if (tmpDir != null) {
+			return new File(tmpDir, Integer.toHexString(hash));
+		} else {
+			return null;
+		}
 	}
 	
 	/**
@@ -79,7 +91,7 @@ public class StanfordDependencyParser {
 	 */
 	public SemanticGraph parse(String sentence) {
 		File cacheFile = getCacheFile(sentence);
-		if (cacheFile.exists()) {
+		if (cacheFile != null && cacheFile.exists()) {
 			return readTree(cacheFile);
 		}
 		Annotation document = new Annotation(sentence);
@@ -96,7 +108,9 @@ public class StanfordDependencyParser {
 		CoreMap firstSentence = sentences.get(0);
 		SemanticGraph dependencies = firstSentence.get(CollapsedCCProcessedDependenciesAnnotation.class);
 		
-		writeTree(dependencies, cacheFile);
+		if (cacheFile != null) {
+			writeTree(dependencies, cacheFile);
+		}
 		
 		return dependencies;
 	}

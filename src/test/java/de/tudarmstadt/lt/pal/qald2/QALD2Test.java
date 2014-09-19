@@ -17,12 +17,14 @@ import java.util.Set;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.xml.sax.SAXException;
 
 import de.tudarmstadt.lt.pal.KnowledgeBaseConnector;
+import de.tudarmstadt.lt.pal.KnowledgeBaseConnector.Answer;
 import de.tudarmstadt.lt.pal.Query;
 import de.tudarmstadt.lt.pal.QueryMapper;
 import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
@@ -35,14 +37,21 @@ import edu.stanford.nlp.semgraph.SemanticGraph;
 @RunWith(ParallelParameterized.class)
 public class QALD2Test {
 	QALD2Entry entry;
-	KnowledgeBaseConnector kb = new KnowledgeBaseConnector("http://localhost:8890/sparql/");
-	QueryMapper tripleMapper = new QueryMapper(kb);
+	KnowledgeBaseConnector kb;
+	QueryMapper tripleMapper;
 	StanfordCoreNLP pipeline;
-	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
-	StanfordDependencyParser depParser = new StanfordDependencyParser("/Volumes/Bill/No-Backup/stanford-parser-tmp");
+	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder();
+	StanfordDependencyParser depParser = new StanfordDependencyParser(/*"/Volumes/Bill/No-Backup/stanford-parser-tmp"*/);
+	private static float recall = 0.0f;
+	private static float precision = 0.0f;
+	private static int correctQuestions = 0;
+	private static int partiallyCorrectQuestions = 0;
+	private static int answeredQuestions = 0;
 	
-	public QALD2Test(String question, QALD2Entry entry) {
+	public QALD2Test(String question, QALD2Entry entry) throws IOException {
 		this.entry = entry;
+		kb = new KnowledgeBaseConnector("src/main/resources/sparql_endpoints/dbpedia-37-local.properties");
+		tripleMapper = new QueryMapper(kb);
 	}
 	
 	@Parameterized.Parameters(name="{0}")
@@ -61,9 +70,10 @@ public class QALD2Test {
 	
 	@Test
 	public void test() throws ParseException {
-		Set<String> answers = new HashSet<String>();
+		Set<String> answers = new HashSet<>();
 		SemanticGraph dependencies = depParser.parse(entry.question);
 		Query pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
+		System.out.println(pseudoQuery);
 		assertTrue(pseudoQuery.triples != null);
 		assertTrue(pseudoQuery.triples.size() > 0);
 		assertTrue(pseudoQuery.vars != null);
@@ -76,10 +86,16 @@ public class QALD2Test {
 		String focusVar = pseudoQuery.focusVar.name;
 		try {
 			System.out.println("?" + focusVar + ":");
-			answers.addAll(kb.query(query));
+			Collection<Answer> queryAnswers = kb.query(query);
+			for (Answer a : queryAnswers) {
+				answers.add(a.value);
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		
+		answeredQuestions++;
+		assertTrue(!answers.isEmpty());
 		
 		String firstAnswer = null;
 		if (answers.iterator().hasNext()) {
@@ -88,33 +104,81 @@ public class QALD2Test {
 		try {
 			switch (entry.answerType) {
 			case Resource:
+				Set<String> correctAnswers = new HashSet<>(answers);
+				correctAnswers.retainAll(entry.answerResources);
+				recall += (float)correctAnswers.size() / entry.answerResources.size();
+				precision += (float)correctAnswers.size() / answers.size();
+				if (answers.equals(entry.answerResources)) {
+					correctQuestions++;
+				} else if (correctAnswers.size() > 0) {
+					partiallyCorrectQuestions++;
+				}
 				assertEquals(entry.answerResources, answers);
-				break;
+				return;
 			case String:
+				if (entry.answerString.equals(firstAnswer)) {
+					recall += 1;
+					precision += 1;
+					correctQuestions++;
+				}
 				assertEquals(entry.answerString, firstAnswer);
-				break;
+				return;
 			case Boolean:
 				fail(); // Not implemented yet
 				assertTrue(firstAnswer != null);
 				assertEquals(entry.answerBoolean, Boolean.parseBoolean(firstAnswer));
-				break;
+				return;
 			case Date:
+				if (firstAnswer != null && entry.answerDate.equals(DateUtil.parseDate(firstAnswer))) {
+					recall += 1;
+					precision += 1;
+					correctQuestions++;
+				}
 				assertTrue(firstAnswer != null);
 				assertEquals(entry.answerDate, DateUtil.parseDate(firstAnswer));
-				break;
+				return;
 			case Number:
+				if (firstAnswer != null && entry.answerNumber.equals(NumberFormat.getInstance(Locale.US).parse(firstAnswer))) {
+					recall += 1;
+					precision += 1;
+					correctQuestions++;
+				}
 				assertTrue(firstAnswer != null);
 				assertEquals(entry.answerNumber, NumberFormat.getInstance(Locale.US).parse(firstAnswer));
-				break;
+				return;
+			default:
+				fail();
 			}
 		} catch (Exception e) {
 			// This is a parse error on the JUnit side, we don't want this to show up as "error"
 			fail();
 		}
+		System.out.println("oops");
+		fail();
 	}
 	
 	@After
 	public void cleanup() {
 		kb.close();
+		System.out.println("Recall: " + recall);
+		System.out.println("Precision: " + precision);
+		System.out.println("Correct questions: " + correctQuestions);
+		System.out.println("Partially correct questions: " + partiallyCorrectQuestions);
+		System.out.println("Answered questions: " + answeredQuestions);
+		System.out.println("Unanswered questions: " + (100 - answeredQuestions));
+	}
+	
+	@AfterClass
+	public static void printResults() {
+		// no answer is always a precision of 1
+		int unansweredQuestions = 100 - answeredQuestions;
+		precision += unansweredQuestions;
+		System.out.println("Recall: " + recall);
+		System.out.println("Precision: " + precision);
+		System.out.println("F1 score: " + 2*(recall*precision)/(recall+precision));
+		System.out.println("Correct questions: " + correctQuestions);
+		System.out.println("Partially correct questions: " + partiallyCorrectQuestions);
+		System.out.println("Answered questions: " + answeredQuestions);
+		System.out.println("Unanswered questions: " + unansweredQuestions);
 	}
 }

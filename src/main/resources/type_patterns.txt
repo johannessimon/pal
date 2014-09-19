@@ -1,0 +1,4 @@
+y z	*#nnp nn *#nn // e.g. "the book X" -> type of X is "book"
+y z	*#n* mod many // indicates integer type
+y y	*#w* * * // question words indicate type
+z z	* * *#w* // question words indicate type

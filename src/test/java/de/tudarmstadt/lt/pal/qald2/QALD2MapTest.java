@@ -23,6 +23,7 @@ import org.junit.runners.Parameterized;
 import org.xml.sax.SAXException;
 
 import de.tudarmstadt.lt.pal.KnowledgeBaseConnector;
+import de.tudarmstadt.lt.pal.KnowledgeBaseConnector.Answer;
 import de.tudarmstadt.lt.pal.Query;
 import de.tudarmstadt.lt.pal.QueryMapper;
 import de.tudarmstadt.lt.pal.util.DateUtil;
@@ -30,11 +31,13 @@ import de.tudarmstadt.lt.pal.util.DateUtil;
 @RunWith(Parameterized.class)
 public class QALD2MapTest {
 	QALD2Entry entry;
-	KnowledgeBaseConnector kb = new KnowledgeBaseConnector("http://localhost:8890/sparql/");
-	QueryMapper tripleMapper = new QueryMapper(kb);
+	KnowledgeBaseConnector kb;
+	QueryMapper tripleMapper;
 	
-	public QALD2MapTest(String question, QALD2Entry entry) {
+	public QALD2MapTest(String question, QALD2Entry entry) throws IOException {
 		this.entry = entry;
+		kb = new KnowledgeBaseConnector("src/main/resources/sparql_endpoints/dbpedia-37-local.properties");
+		tripleMapper = new QueryMapper(kb);
 	}
 	
 	@Parameterized.Parameters(name="{0}")
@@ -55,7 +58,7 @@ public class QALD2MapTest {
 	
 	@Test
 	public void test() throws ParseException {
-		Set<String> answers = new HashSet<String>();
+		Set<Answer> answers = new HashSet<>();
 
 		Query query = tripleMapper.getBestSPARQLQuery(entry.pseudoQuery);
 		assertTrue(query != null);
@@ -69,7 +72,7 @@ public class QALD2MapTest {
 			e.printStackTrace();
 		}
 		
-		String firstAnswer = null;
+		Answer firstAnswer = null;
 		if (answers.iterator().hasNext()) {
 			firstAnswer = answers.iterator().next();
 		}
@@ -83,15 +86,15 @@ public class QALD2MapTest {
 		case Boolean:
 			fail(); // Not implemented yet
 			assertTrue(firstAnswer != null);
-			assertEquals(entry.answerBoolean, Boolean.parseBoolean(firstAnswer));
+			assertEquals(entry.answerBoolean, Boolean.parseBoolean(firstAnswer.value));
 			break;
 		case Date:
 			assertTrue(firstAnswer != null);
-			assertEquals(entry.answerDate, DateUtil.parseDate(firstAnswer));
+			assertEquals(entry.answerDate, DateUtil.parseDate(firstAnswer.value));
 			break;
 		case Number:
 			assertTrue(firstAnswer != null);
-			assertEquals(entry.answerNumber, NumberFormat.getInstance(Locale.US).parse(firstAnswer));
+			assertEquals(entry.answerNumber, NumberFormat.getInstance(Locale.US).parse(firstAnswer.value));
 			break;
 		}
 	}

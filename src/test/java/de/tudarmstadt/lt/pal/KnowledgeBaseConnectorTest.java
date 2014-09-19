@@ -1,5 +1,6 @@
 package de.tudarmstadt.lt.pal;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -15,7 +16,11 @@ import de.tudarmstadt.lt.pal.Triple.TypeConstraint;
 import de.tudarmstadt.lt.pal.util.ComparablePair;
 
 public class KnowledgeBaseConnectorTest extends TestCase {
-	KnowledgeBaseConnector kb = new KnowledgeBaseConnector("http://localhost:8890/sparql/");
+	KnowledgeBaseConnector kb;
+	
+	public KnowledgeBaseConnectorTest() throws IOException {
+		kb = new KnowledgeBaseConnector("src/main/resources/sparql_endpoints/dbpedia-37-local.properties");
+	}
 	
 	@Test
 	public void testGetPropertyCandidates() {

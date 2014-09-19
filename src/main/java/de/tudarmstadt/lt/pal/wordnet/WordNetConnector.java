@@ -14,6 +14,7 @@ import java.util.Map.Entry;
 
 import de.tudarmstadt.lt.pal.MappedString;
 import de.tudarmstadt.lt.pal.util.ComparablePair;
+import de.tudarmstadt.lt.pal.util.StringUtil;
 import edu.mit.jwi.Dictionary;
 import edu.mit.jwi.IDictionary;
 import edu.mit.jwi.item.IIndexWord;
@@ -54,6 +55,25 @@ public class WordNetConnector {
 		MappedString mappedWord = new MappedString(synonym, trace);
 		addSynonym(synonymScores, mappedWord, score);
 	}
+	/*
+	public void addSynonym(Map<MappedString, Float> synonymScores, MappedString synonym, float score) {
+		synonym.value = synonym.value.replaceAll("_", " ");
+		Collection<ComparablePair<String, Float>> synonymParts = StringUtil.getPartialWords(synonym.value);
+		for (ComparablePair<String, Float> synonymPart : synonymParts) {
+			float _score = score * synonymPart.value;
+			List<String> trace = new LinkedList<>();
+			if (!synonymPart.key.equals(synonym.value)) {
+				trace.add(synonymPart.key + " (partial word)");
+			}
+			MappedString synonymPartMapped = new MappedString(synonymPart.key, trace);
+			Float existingScore = synonymScores.get(synonymPart.key);
+			// Insert only if no such synonym exists yet or if
+			// we've found a better score for the same synonym
+			if (existingScore == null || _score > existingScore) {
+				synonymScores.put(synonymPartMapped, _score);
+			}
+		}
+	}*/
 	
 	public void addSynonym(Map<MappedString, Float> synonymScores, MappedString synonym, float score) {
 		synonym.value = synonym.value.replaceAll("_", " ");
@@ -81,31 +101,13 @@ public class WordNetConnector {
 		return pos;
 	}
 	
-	/**
-	 * Returns semantically meaningful partial words of the given word, e.g.
-	 * "official web site" -> "official web site", "web site", "site"
-	 */
-	public Collection<ComparablePair<String, Float>> getPartialWords(String word) {
-		List<ComparablePair<String, Float>> res = new LinkedList<>();
-		String[] tokens = word.split(" ");
-		for (int i = tokens.length - 1; i >= 0; i--) {
-			String partialWord = "";
-			for (int j = i; j < tokens.length; j++) {
-				partialWord += " " + tokens[j];
-			}
-			partialWord = partialWord.trim();
-			res.add(new ComparablePair<String, Float>(partialWord, (float)partialWord.length() / word.length()));
-		}
-		return res;
-	}
-	
-	public Map<MappedString, Float> getSynonyms(String word, String posStr) {
+	public Map<MappedString, Float> getSynonymsAndHypernyms(String word, String posStr) {
 		Map<MappedString, Float> synonymScores = new HashMap<>();
 		POS pos = posFromString(posStr);
 		if (pos == null) {
 			return new HashMap<>();
 		}
-		Collection<ComparablePair<String, Float>> partialWords = getPartialWords(word);
+		Collection<ComparablePair<String, Float>> partialWords = StringUtil.getPartialMainWords(word);
 		for (ComparablePair<String, Float> partialWord : partialWords) {
 			IIndexWord idxWord = dict.getIndexWord(partialWord.key, pos);
 			if (idxWord == null) {
@@ -120,6 +122,9 @@ public class WordNetConnector {
 				IWord w = dict.getWord(wordID);
 				// Get direct and transitive synonyms
 				addSynonyms(synonymScores, getSynonyms(w, 1, 2, trace), partialWord.value);
+				// must be > 0.1 because queries without type constraints are scored with a factor of 0.1
+				float hypernymPenalty = 0.5f;
+				addSynonyms(synonymScores, getHypernyms(w.getSynset(), 3, trace), partialWord.value*hypernymPenalty);
 			}
 		}
 		
@@ -133,7 +138,7 @@ public class WordNetConnector {
 			return new HashMap<>();
 		}
 		List<String> trace = Arrays.asList(word);
-		Collection<ComparablePair<String, Float>> partialWords = getPartialWords(word);
+		Collection<ComparablePair<String, Float>> partialWords = StringUtil.getPartialMainWords(word);
 		for (ComparablePair<String, Float> partialWord : partialWords) {
 			float factor = partialWord.value;
 			IIndexWord idxWord = dict.getIndexWord(partialWord.key, pos);
@@ -236,6 +241,6 @@ public class WordNetConnector {
 	
 	public static void main(String[] args) {
 		WordNetConnector wnc = new WordNetConnector("/Volumes/Bill/No-Backup/wordnet31/dict");
-		wnc.getSynonyms("die", "v");
+		wnc.getSynonymsAndHypernyms("die", "v");
 	}
 }

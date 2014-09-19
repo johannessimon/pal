@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 
+import de.tudarmstadt.lt.pal.KnowledgeBaseConnector.Answer;
 import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
 import de.tudarmstadt.lt.pal.stanford.StanfordPseudoQueryBuilder;
 import edu.stanford.nlp.semgraph.SemanticGraph;
@@ -14,10 +15,19 @@ import edu.stanford.nlp.semgraph.SemanticGraph;
  * Simple front-end for PAL using the console.
  */
 public class NLI {
-	KnowledgeBaseConnector kb = new KnowledgeBaseConnector("http://localhost:8890/sparql/");
-	QueryMapper tripleMapper = new QueryMapper(kb);
-	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder(kb);
-	StanfordDependencyParser depParser = new StanfordDependencyParser("/Users/jsimon/No-Backup/stanford-parser-tmp");
+	KnowledgeBaseConnector kb;
+	QueryMapper tripleMapper;
+	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder();
+	StanfordDependencyParser depParser = new StanfordDependencyParser(/*"/Users/jsimon/No-Backup/stanford-parser-tmp"*/);
+	
+	public NLI() {
+		try {
+			kb = new KnowledgeBaseConnector("src/main/resources/dbpedia-37-local.properties");
+			tripleMapper = new QueryMapper(kb);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 
 	public static void main(String[] args) {
 		new NLI().runInteractive();
@@ -42,8 +52,8 @@ public class NLI {
 		kb.close();
 	}
 	
-	public Collection<String> run(String text) {
-		List<String> answers = new LinkedList<String>();
+	public Collection<Answer> run(String text) {
+		List<Answer> answers = new LinkedList<>();
 		SemanticGraph dependencies = depParser.parse(text);
 		Query pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
 		System.out.println("PSEUDO QUERY: " + pseudoQuery);
@@ -54,7 +64,7 @@ public class NLI {
 		try {
 //			String focusVar = pseudoQuery.focusVar.name;
 //			System.out.println("?" + focusVar + ":");
-			Collection<String> _answers = kb.query(query);
+			Collection<Answer> _answers = kb.query(query);
 			answers.addAll(_answers);
 		} catch (Exception e) {
 			e.printStackTrace();
