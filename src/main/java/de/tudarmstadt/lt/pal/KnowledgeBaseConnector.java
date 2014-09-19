@@ -254,6 +254,22 @@ public class KnowledgeBaseConnector {
 		}
 	}
 	
+	private int getClassCount(String rUri) {
+		String query = "SELECT DISTINCT (COUNT(?s) AS ?count) WHERE {?s a <" + rUri + ">}";
+		try {
+			QueryExecution qexec = getQueryExec(query);
+			ResultSet results = qexec.execSelect();
+			while (results.hasNext()) {
+				QuerySolution sol = results.next();
+				return sol.getLiteral("?count").getInt();
+			}
+			qexec.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return 0;
+	}
+	/*
 	private int getClassCount(Resource classResource) {
 		Integer count = classesInUse.get(classResource);
 		if (count == null) {
@@ -275,7 +291,7 @@ public class KnowledgeBaseConnector {
 			count = 0;
 		}
 		return count;
-	}
+	}*/
 	
 	public boolean resourceIsClass(String uri) {
 		return classesInUseSet.contains(uri);
@@ -307,7 +323,31 @@ public class KnowledgeBaseConnector {
 		}
 	}*/
 	
-	List<ComparablePair<MappedString, Float>> getTypeCandidates(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
+	ComparablePair<MappedString, Float> getType(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
+		List<ComparablePair<MappedString, Float>> candidates = getTypeCandidates(nameCandidates);
+		float bestScore = 0.0f;
+		// Create sublist of equally-weighted top candidates (usually just one or two)
+		int i;
+		for (i = 0; i < candidates.size(); i++) {
+			ComparablePair<MappedString, Float> c = candidates.get(i);
+			float score = c.value;
+			int typeCount = getClassCount(c.key.value);
+			c.value += 0.01f * (float)Math.log(typeCount);
+			if (score > bestScore) {
+				bestScore = score;
+			} else if (c.value < bestScore) {
+				break;
+			}
+		}
+		if (candidates.size() > 0) {
+			List<ComparablePair<MappedString, Float>> candidatesCut = candidates.subList(0, i);
+			Collections.sort(candidatesCut);
+			return candidatesCut.get(0);
+		}
+		return null;
+	}
+	
+	private List<ComparablePair<MappedString, Float>> getTypeCandidates(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
 		List<ComparablePair<MappedString, Float>> types = new LinkedList<ComparablePair<MappedString, Float>>();
 		for (ComparablePair<MappedString, Float> c : nameCandidates) {
 			String name = formatResourceName(c.key.value);
@@ -318,8 +358,7 @@ public class KnowledgeBaseConnector {
 //				Collection<String> labels = typeEntry.getValue();
 				String typeName = formatResourceName(type.getLocalName());
 				if (StringUtil.hasPart(typeName, name)) {
-					int typeCount = getClassCount(type);
-					float score = c.value * name.length() / (float)typeName.length() + 0.01f * (float)Math.log(typeCount);
+					float score = c.value * name.length() / (float)typeName.length();
 					List<String> trace = new LinkedList<String>(c.key.trace);
 					trace.add(getSPARQLResourceString(type.getURI()) + " (URI match)");
 					MappedString mappedType = new MappedString(type.getURI(), trace);

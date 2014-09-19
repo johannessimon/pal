@@ -112,11 +112,10 @@ public class QueryMapper {
 			for (Entry<MappedString, Float> entry : nameCandidates.entrySet()) {
 				nameCandidateSet.add(new ComparablePair<MappedString, Float>(entry.getKey(), entry.getValue() * synonymPenalty));
 			}
-			List<ComparablePair<MappedString, Float>> typeCandidates = kb.getTypeCandidates(nameCandidateSet);
-			if (typeCandidates != null && !typeCandidates.isEmpty()) {
-				ComparablePair<MappedString, Float> first = typeCandidates.iterator().next();
-				score = first.value;
-				MappedString r = first.key;
+			ComparablePair<MappedString, Float> type = kb.getType(nameCandidateSet);
+			if (type != null) {
+				score = type.value;
+				MappedString r = type.key;
 				if (kb.resourceIsClass(r.value)) {
 					basicType = TypeConstraint.BasicType.Resource;
 				}
