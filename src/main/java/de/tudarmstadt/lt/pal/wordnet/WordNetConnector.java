@@ -87,7 +87,10 @@ public class WordNetConnector {
 		}
 		Collection<ComparablePair<String, Float>> partialWords = StringUtil.getPartialMainWords(word);
 		for (ComparablePair<String, Float> partialWord : partialWords) {
-			IIndexWord idxWord = dict.getIndexWord(partialWord.key, pos);
+			IIndexWord idxWord;
+			synchronized (dict) {
+				idxWord = dict.getIndexWord(partialWord.key, pos);
+			}
 			if (idxWord == null) {
 				continue;
 			}
@@ -97,7 +100,10 @@ public class WordNetConnector {
 				trace.add(idxWord.getLemma() + " (partial word)");
 			}
 			for (IWordID wordID : idxWord.getWordIDs()) {
-				IWord w = dict.getWord(wordID);
+				IWord w;
+				synchronized (dict) {
+					w = dict.getWord(wordID);
+				}
 				// Get direct and transitive synonyms
 				addSynonyms(synonymScores, getSynonyms(w, 1, 2, trace), partialWord.value);
 				// must be > 0.1 because queries without type constraints are scored with a factor of 0.1
@@ -119,7 +125,10 @@ public class WordNetConnector {
 		Collection<ComparablePair<String, Float>> partialWords = StringUtil.getPartialMainWords(word);
 		for (ComparablePair<String, Float> partialWord : partialWords) {
 			float factor = partialWord.value;
-			IIndexWord idxWord = dict.getIndexWord(partialWord.key, pos);
+			IIndexWord idxWord;
+			synchronized (dict) {
+				idxWord = dict.getIndexWord(partialWord.key, pos);
+			}
 			if (idxWord == null) {
 				continue;
 			}
@@ -128,7 +137,10 @@ public class WordNetConnector {
 			// (human is not a synonym of author, but the other way around)
 			float hypernymPenalty = 0.1f;
 			for (IWordID wordID : idxWord.getWordIDs()) {
-				IWord w = dict.getWord(wordID);
+				IWord w;
+				synchronized (dict) {
+					w = dict.getWord(wordID);
+				}
 				List<String> _trace = new LinkedList<String>(trace);
 				// only add "partial node" notice if it actually is only a part
 				if (!w.getLemma().equals(word)) {
@@ -142,7 +154,10 @@ public class WordNetConnector {
 				
 				List<IWordID> rWordIDs = w.getRelatedWords(Pointer.DERIVATIONALLY_RELATED);
 				for (IWordID rWordID : rWordIDs) {
-					IWord rW = dict.getWord(rWordID);
+					IWord rW;
+					synchronized (dict) {
+						rW = dict.getWord(rWordID);
+					}
 					List<String> __trace = new LinkedList<String>(_trace);
 					__trace.add(rW.getLemma() + " (related form)");
 					addSynonym(synonymScores, rW.getLemma(), __trace, factor);
@@ -163,9 +178,15 @@ public class WordNetConnector {
 		if (depth > maxDepth) {
 			return res;
 		}
-		List<IWordID> words = dict.getIndexWord(word.getLemma(), word.getPOS()).getWordIDs();
+		List<IWordID> words;
+		synchronized (dict) {
+			words = dict.getIndexWord(word.getLemma(), word.getPOS()).getWordIDs();
+		}
 		for (IWordID sameWordInOtherSynset : words) {
-			ISynset s = dict.getWord(sameWordInOtherSynset).getSynset();
+			ISynset s;
+			synchronized (dict) {
+				s = dict.getWord(sameWordInOtherSynset).getSynset();
+			}
 			for (IWord synonym : s.getWords()) {
 				float score = 1.0f - (float)depth / (maxDepth + 1);
 				List<String> _trace = new LinkedList<String>(trace);
@@ -200,7 +221,10 @@ public class WordNetConnector {
 //		Map foo = word.getRelatedMap();
 		List<ISynsetID> sIDs = s.getRelatedSynsets(relationType);
 		for (ISynsetID sID : sIDs) {
-			ISynset hS = dict.getSynset(sID);
+			ISynset hS;
+			synchronized (dict) {
+				hS = dict.getSynset(sID);
+			}
 			List<String> _trace = new LinkedList<String>(trace);
 			_trace.add(hS.getGloss() + " (" + relationType.getName() + ")");
 			for (IWord h : hS.getWords()) {
