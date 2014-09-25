@@ -2,7 +2,6 @@ package de.tudarmstadt.lt.pal.wordnet;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -33,10 +32,8 @@ public class WordNetConnector {
 		try {
 			dict = new Dictionary(new File(dir));
 			dict.open();
-		} catch (MalformedURLException e) {
-			e.printStackTrace();
 		} catch (IOException e) {
-			e.printStackTrace();
+			throw new RuntimeException("Failed to initialize WordNetConnector from " + dir, e);
 		}
 	}
 	
@@ -55,25 +52,6 @@ public class WordNetConnector {
 		MappedString mappedWord = new MappedString(synonym, trace);
 		addSynonym(synonymScores, mappedWord, score);
 	}
-	/*
-	public void addSynonym(Map<MappedString, Float> synonymScores, MappedString synonym, float score) {
-		synonym.value = synonym.value.replaceAll("_", " ");
-		Collection<ComparablePair<String, Float>> synonymParts = StringUtil.getPartialWords(synonym.value);
-		for (ComparablePair<String, Float> synonymPart : synonymParts) {
-			float _score = score * synonymPart.value;
-			List<String> trace = new LinkedList<>();
-			if (!synonymPart.key.equals(synonym.value)) {
-				trace.add(synonymPart.key + " (partial word)");
-			}
-			MappedString synonymPartMapped = new MappedString(synonymPart.key, trace);
-			Float existingScore = synonymScores.get(synonymPart.key);
-			// Insert only if no such synonym exists yet or if
-			// we've found a better score for the same synonym
-			if (existingScore == null || _score > existingScore) {
-				synonymScores.put(synonymPartMapped, _score);
-			}
-		}
-	}*/
 	
 	public void addSynonym(Map<MappedString, Float> synonymScores, MappedString synonym, float score) {
 		synonym.value = synonym.value.replaceAll("_", " ");
@@ -226,10 +204,6 @@ public class WordNetConnector {
 			List<String> _trace = new LinkedList<String>(trace);
 			_trace.add(hS.getGloss() + " (" + relationType.getName() + ")");
 			for (IWord h : hS.getWords()) {
-//				if (h.getLemma().equals("bridge")) {
-//					System.out.println("stop");
-//				}
-
 				List<String> __trace = new LinkedList<String>(trace);
 				__trace.add(h.getLemma() + " (" + relationType.getName() + ")");
 				addSynonym(res, h.getLemma(), __trace, scoreInThisDepth);
@@ -237,10 +211,5 @@ public class WordNetConnector {
 			addSynonyms(res, getRelatedWords(hS, depth + 1, maxDepth, relationType, assignDepthPenalty, _trace));
 		}
 		return res;
-	}
-	
-	public static void main(String[] args) {
-		WordNetConnector wnc = new WordNetConnector("/Volumes/Bill/No-Backup/wordnet31/dict");
-		wnc.getSynonymsAndHypernyms("die", "v");
 	}
 }

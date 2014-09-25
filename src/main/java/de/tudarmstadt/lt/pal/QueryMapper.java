@@ -1,4 +1,5 @@
 package de.tudarmstadt.lt.pal;
+import java.io.File;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -24,9 +25,16 @@ import de.tudarmstadt.lt.pal.wordnet.WordNetConnector;
  */
 public class QueryMapper {
 	KnowledgeBaseConnector kb;
-	WordNetConnector wnc = new WordNetConnector("/Volumes/Bill/No-Backup/wordnet31/dict");
+	WordNetConnector wnc;
 	
 	public QueryMapper(KnowledgeBaseConnector kb) {
+		String wnHome = System.getenv("WNHOME");
+		if (wnHome == null) {
+			throw new IllegalArgumentException("WNHOME environment variable not set.");
+		} else if (!new File(wnHome).exists()) {
+			throw new IllegalArgumentException("WNHOME directory (" + wnHome + ") does not exist.");
+		}
+		wnc = new WordNetConnector(wnHome + "/dict");
 		this.kb = kb;
 	}
 	
