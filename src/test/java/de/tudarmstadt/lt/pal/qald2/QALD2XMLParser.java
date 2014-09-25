@@ -1,7 +1,6 @@
 package de.tudarmstadt.lt.pal.qald2;
 
 import java.io.IOException;
-import java.net.URLDecoder;
 import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
@@ -102,7 +101,7 @@ public class QALD2XMLParser {
 						String answerText = answerNode.getTextContent().trim();
 						switch (qald2Entry.answerType) {
 						case Resource:
-							qald2Entry.answerResources.add(URLDecoder.decode(answerText, "UTF-8"));
+							qald2Entry.answerResources.add(answerText);
 							break;
 						case String:
 							qald2Entry.answerString = answerText;

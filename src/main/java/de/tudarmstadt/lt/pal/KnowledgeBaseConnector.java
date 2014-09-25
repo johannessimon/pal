@@ -205,7 +205,7 @@ public class KnowledgeBaseConnector {
 			if (Character.isUpperCase(c) && i > 0) {
 				formattedName.append(' ');
 			}
-			if (Character.isAlphabetic(c)) {
+			if (Character.isLetter(c)) {
 				formattedName.append(Character.toLowerCase(c));
 			}
 		}
