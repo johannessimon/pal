@@ -95,6 +95,7 @@ public class KnowledgeBaseConnector {
 		namespacePrefixes.put("http://jena.apache.org/text#", "text");
 		namespacePrefixes.put("http://purl.org/ontology/bibo/", "bibo");
 		namespacePrefixes.put("http://purl.org/ontology/mo/", "mo");
+		namespacePrefixes.put("http://schema.org/", "schema");
 	}
 	
 	private String getNamespacePrefixDeclarations(String query) {
@@ -326,25 +327,33 @@ public class KnowledgeBaseConnector {
 	ComparablePair<MappedString, Float> getType(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
 		List<ComparablePair<MappedString, Float>> candidates = getTypeCandidates(nameCandidates);
 		float bestScore = 0.0f;
-		// Create sublist of equally-weighted top candidates (usually just one or two)
-		int i;
-		for (i = 0; i < candidates.size(); i++) {
-			ComparablePair<MappedString, Float> c = candidates.get(i);
-			float score = c.value;
-			int typeCount = getClassCount(c.key.value);
-			c.value += 0.01f * (float)Math.log(typeCount);
-			if (score > bestScore) {
-				bestScore = score;
-			} else if (c.value < bestScore) {
-				break;
-			}
-		}
 		if (candidates.size() > 0) {
+			// list is sorted in descending order
+			bestScore = candidates.get(0).value;
+			// Create sublist of equally-weighted top candidates (usually just one or two)
+			int i;
+			for (i = 0; i < candidates.size(); i++) {
+				ComparablePair<MappedString, Float> c = candidates.get(i);
+				if (c.value < bestScore) {
+					break;
+				}
+				int typeCount = getClassCount(c.key.value);
+				c.value += 0.01f * (float)Math.log(typeCount);
+			}
 			List<ComparablePair<MappedString, Float>> candidatesCut = candidates.subList(0, i);
 			Collections.sort(candidatesCut);
 			return candidatesCut.get(0);
 		}
 		return null;
+	}
+	
+	private String getLocalName(String uri) {
+		char sep = '/';
+		if (uri.contains("#")) {
+			sep = '#';
+		}
+		int index = uri.lastIndexOf(sep);
+		return uri.substring(index + 1);
 	}
 	
 	private List<ComparablePair<MappedString, Float>> getTypeCandidates(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
@@ -356,9 +365,12 @@ public class KnowledgeBaseConnector {
 //				List<ComparablePair<MappedString, Float>> _thisTypeScores = new LinkedList<>();
 //				Resource type = typeEntry.getKey();
 //				Collection<String> labels = typeEntry.getValue();
-				String typeName = formatResourceName(type.getLocalName());
+				String typeName = formatResourceName(getLocalName(type.getURI()));
 				if (StringUtil.hasPart(typeName, name)) {
 					float score = c.value * name.length() / (float)typeName.length();
+					if (Float.isNaN(score)) {
+						System.out.println("oops");
+					}
 					List<String> trace = new LinkedList<String>(c.key.trace);
 					trace.add(getSPARQLResourceString(type.getURI()) + " (URI match)");
 					MappedString mappedType = new MappedString(type.getURI(), trace);
@@ -414,7 +426,7 @@ public class KnowledgeBaseConnector {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		return "(no label)";
+		return uri;
 	}
 	
 	Map<String, List<ComparablePair<MappedString, Float>>> resourceCandidateCache = new HashMap<String, List<ComparablePair<MappedString, Float>>>();
@@ -732,6 +744,10 @@ public class KnowledgeBaseConnector {
 	 */
 	Collection<ComparablePair<MappedString, Float>> getPropertyCandidates(List<ComparablePair<MappedString, Float>> nameCandidates, String subjectURI, String objectURI,
 			                                                          TypeConstraint subjectTC, TypeConstraint objectTC) {
+		// Literals on the subject side don't make sense
+		if (subjectTC != null && subjectTC.basicType == BasicType.Literal) {
+			return new LinkedList<ComparablePair<MappedString, Float>>();
+		}
 		boolean subjectHasClassConstraint = subjectTC != null && subjectTC.basicType == BasicType.Resource;
 		boolean objectHasClassConstraint = objectTC != null && objectTC.basicType == BasicType.Resource;
 		// This doesn't make much sense (we need at least one constraint, otherwise we'll query the entire DB)
