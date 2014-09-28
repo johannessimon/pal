@@ -79,7 +79,7 @@ public class StanfordPseudoQueryBuilder {
 			} else if (typeStr.equals("when")) {
 				varType = Variable.Type.Date;
 			} else if (typeStr.equals("many")) {
-				varType = Variable.Type.Integer;
+				varType = Variable.Type.Number;
 			}
 		}
 		// Adjectives always refer to data properties (i.e. with literals as object)

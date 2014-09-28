@@ -51,9 +51,6 @@ public class KnowledgeBaseConnector {
 		return !localName.matches(invalidPattern);
 	}
 	
-//	public final static String OWL_CLASS_URI = "http://www.w3.org/2002/07/owl#Class";
-//	public final static String OWL_OBJECT_PROPERTY_URI = "http://www.w3.org/2002/07/owl#ObjectProperty";
-	
 	/**
 	 * Returns a short representation of the resource's URI using
 	 * known namespace prefixes. Uses <code>?varName</code> instead
@@ -100,6 +97,7 @@ public class KnowledgeBaseConnector {
 		namespacePrefixes.put("http://purl.org/ontology/bibo/", "bibo");
 		namespacePrefixes.put("http://purl.org/ontology/mo/", "mo");
 		namespacePrefixes.put("http://schema.org/", "schema");
+		namespacePrefixes.put("http://purl.org/dc/terms/", "dc");
 	}
 	
 	/**
@@ -213,8 +211,6 @@ public class KnowledgeBaseConnector {
 		query = query.replace("WHERE", from + "\nWHERE");
 		query = getNamespacePrefixDeclarations(query) + "\n" + query;
 		log.debug("SPARQL query: " + query.replace("\n", " "));
-//		QueryExecution qexec = null;
-//		qexec = QueryExecutionFactory.sparqlService(sparqlEndpoint, query);
 		return new QueryEngineHTTP(sparqlEndpoint, query);
 	}
 	
@@ -226,11 +222,7 @@ public class KnowledgeBaseConnector {
 		StringBuilder formattedName = new StringBuilder();
 		for (int i = 0; i < name.length(); i++) {
 			char c = name.charAt(i);
-			if (c == '_') {
-				formattedName.append(' ');
-				continue;
-			}
-			if (Character.isUpperCase(c) && i > 0) {
+			if (i > 0 && (Character.isUpperCase(c) || c == '_' || c == '-')) {
 				formattedName.append(' ');
 			}
 			if (Character.isLetter(c)) {
@@ -264,8 +256,7 @@ public class KnowledgeBaseConnector {
 	private void retrieveClassesInUse() {
 		classesInUseSet = new HashSet<String>();
 		classesInUse = new HashMap<String, Integer>();
-//		String query = "SELECT DISTINCT ?t (COUNT(?s) AS ?count) WHERE {?s a ?t} GROUP BY ?t";
-		String query = "PREFIX owl: <http://www.w3.org/2002/07/owl#>  SELECT ?t (COUNT(?t) as ?count)  WHERE { ?s a ?t } GROUP BY ?t ORDER BY DESC(?count) LIMIT 10000";
+		String query = "SELECT ?t (COUNT(?t) as ?count)  WHERE { ?s a ?t } GROUP BY ?t ORDER BY DESC(?count) LIMIT 10000";
 		try {
 			QueryExecution qexec = getQueryExec(query);
 			ResultSet results = qexec.execSelect();
@@ -287,7 +278,7 @@ public class KnowledgeBaseConnector {
 			e.printStackTrace();
 		}
 	}
-	
+	/*
 	private int getClassCount(String rUri) {
 		String query = "SELECT DISTINCT (COUNT(?s) AS ?count) WHERE {?s a <" + rUri + ">}";
 		try {
@@ -302,60 +293,11 @@ public class KnowledgeBaseConnector {
 			e.printStackTrace();
 		}
 		return 0;
-	}
-	/*
-	private int getClassCount(Resource classResource) {
-		Integer count = classesInUse.get(classResource);
-		if (count == null) {
-			String query = "SELECT DISTINCT (COUNT(?s) AS ?count) WHERE {?s a <" + classResource.getURI() + ">}";
-			try {
-				QueryExecution qexec = getQueryExec(query);
-				ResultSet results = qexec.execSelect();
-				while (results.hasNext()) {
-					QuerySolution sol = results.next();
-					count = sol.getLiteral("?count").getInt();
-					classesInUse.put(classResource, count);
-				}
-				qexec.close();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-		if (count == null) {
-			count = 0;
-		}
-		return count;
 	}*/
 	
 	public boolean resourceIsClass(String uri) {
 		return classesInUseSet.contains(uri);
 	}
-	
-	/*
-	Map<Resource, Collection<String>> classesInUse;
-	private void retrieveClassesInUse() {
-		classesInUse = new HashMap<>();
-		// Selects all classes that are actually in use along with their labels
-		String query = "SELECT DISTINCT ?t ?l WHERE { ?t a owl:Class . ?s a ?t . ?t rdfs:label ?l . FILTER(lang(?l) = \"\" || langMatches(lang(?l), \"en\"))}";
-		try {
-			QueryExecution qexec = getQueryExec(query);
-			ResultSet results = qexec.execSelect();
-			while (results.hasNext()) {
-				QuerySolution sol = results.next();
-				Resource classResource = sol.getResource("?t");
-//				String classLabel = sol.getLiteral("?l").toString();
-				Collection<String> labels = classesInUse.get(classResource);
-				if (labels == null) {
-					labels = new LinkedList<String>();
-					classesInUse.put(classResource, labels);
-				}
-				labels.add(classLabel);
-			}
-			qexec.close();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}*/
 	
 	ComparablePair<MappedString, Float> getType(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
 		List<ComparablePair<MappedString, Float>> candidates = getTypeCandidates(nameCandidates);
@@ -370,7 +312,7 @@ public class KnowledgeBaseConnector {
 				if (c.value < bestScore) {
 					break;
 				}
-				int typeCount = getClassCount(c.key.value);
+				int typeCount = classesInUse.get(c.key.value);
 				c.value += 0.01f * (float)Math.log(typeCount);
 			}
 			List<ComparablePair<MappedString, Float>> candidatesCut = candidates.subList(0, i);
@@ -390,43 +332,23 @@ public class KnowledgeBaseConnector {
 	}
 	
 	private List<ComparablePair<MappedString, Float>> getTypeCandidates(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
+		log.debug("Searching types for name candidates: " + nameCandidates);
 		List<ComparablePair<MappedString, Float>> types = new LinkedList<ComparablePair<MappedString, Float>>();
 		for (ComparablePair<MappedString, Float> c : nameCandidates) {
 			String name = formatResourceName(c.key.value);
-//			for (Entry<Resource, Collection<String>> typeEntry : classesInUse.entrySet()) {
 			for (String typeUri : classesInUse.keySet()) {
-//				List<ComparablePair<MappedString, Float>> _thisTypeScores = new LinkedList<>();
-//				Resource type = typeEntry.getKey();
-//				Collection<String> labels = typeEntry.getValue();
 				String typeName = formatResourceName(getLocalName(typeUri));
 				if (StringUtil.hasPart(typeName, name)) {
 					float score = c.value * name.length() / (float)typeName.length();
 					List<String> trace = new LinkedList<String>(c.key.trace);
 					trace.add(getSPARQLResourceString(typeUri) + " (URI match)");
 					MappedString mappedType = new MappedString(typeUri, trace);
-//					_thisTypeScores.add(new ComparablePair<>(mappedType, c.value * score));
 					types.add(new ComparablePair<MappedString, Float>(mappedType, score));
-//					continue;
 				}
-				/*
-				for (String label : labels) {
-					if (StringUtil.hasPart(label, name)) {
-						float score = name.length() / (float)label.length();
-						List<String> trace = new LinkedList<>(c.key.trace);
-						trace.add(getSPARQLResourceString(type.getURI()) + " (label match)");
-						MappedString mappedType = new MappedString(type.getURI(), trace);
-						_thisTypeScores.add(new ComparablePair<>(mappedType, c.value * score));
-//						break;
-					}
-				}
-				// Add only the best score of this type
-				if (!_thisTypeScores.isEmpty()) {
-					Collections.sort(_thisTypeScores);
-					types.add(_thisTypeScores.get(0));
-				}*/
 			}
 		}
 		Collections.sort(types);
+		log.debug("Type candidates: " + types);
 		return types;
 	}
 	
@@ -458,9 +380,6 @@ public class KnowledgeBaseConnector {
 				String queryString = "SELECT DISTINCT ?subject ?name WHERE { \n"
 			                       + "  { ?subject foaf:name ?name . " + fillTextIndexSearchPattern(textIndexSearchPattern, "?name", name) + "} UNION\n"
 					               + "  { ?subject rdfs:label ?name . " + fillTextIndexSearchPattern(textIndexSearchPattern, "?name", name) + "} . \n"
-								   // Important: text:query must come first for pre-filtering (otherwise it takes much longer)
-	//						       + "  ?subject text:query('" + name + "' " + limit + ") . \n"
-	//		                       + "  ?subject a owl:Thing . \n"
 								   + "  { ?subject foaf:name ?name . FILTER(lang(?name) = \"\" || langMatches(lang(?name), \"en\")) }\n"
 	                               + "  UNION\n"
 	                               + "  { ?subject rdfs:label ?name . FILTER(lang(?name) = \"\" || langMatches(lang(?name), \"en\")) }\n"
@@ -589,8 +508,8 @@ public class KnowledgeBaseConnector {
 		}
 		for (Variable var : q.vars.values()) {
 			queryStr += "   OPTIONAL { ";
-			queryStr += "{ " + var.sparqlString() + " rdfs:label ?string . FILTER (lang(?string)=\"en\") } UNION";
-			queryStr += "{ " + var.sparqlString() + " foaf:name ?string . FILTER (lang(?string)=\"en\") }";
+			queryStr += "{ " + var.sparqlString() + " rdfs:label ?string . FILTER (lang(?string)=\"en\" || lang(?string)=\"\") } UNION";
+			queryStr += "{ " + var.sparqlString() + " foaf:name ?string . FILTER (lang(?string)=\"en\" || lang(?string)=\"\") }";
 			queryStr += "} .\n";
 		}
 
@@ -725,9 +644,13 @@ public class KnowledgeBaseConnector {
 		} else if (tc.basicType == BasicType.Resource) {
 			return "   ?" + varName + " a " + getSPARQLResourceString(tc.typeURI.value) + " . \n";
 		} else/* if (tc.basicType == BasicType.Literal)*/ {
-			String res = "   FILTER(ISLITERAL(?" + varName + ")";
-			if (tc.typeURI != null) {
-				res += " && DATATYPE(?" + varName + ") = " + getSPARQLResourceString(tc.typeURI.value);
+			String res = "   FILTER(";
+			if (tc.typeURI != null && tc.typeURI.value.equals("_number_")) {
+				res += "ISNUMERIC(?" + varName + ")";
+			} else if (tc.typeURI != null) {
+				res += "DATATYPE(?" + varName + ") = " + getSPARQLResourceString(tc.typeURI.value);
+			} else {
+				res += "ISLITERAL(?" + varName + ")";
 			}
 			res += ") . \n";
 			return res;
@@ -867,7 +790,9 @@ public class KnowledgeBaseConnector {
 		Collections.sort(result);
 		int numResults = Math.min(result.size(), 10);
 		
-		return result.subList(0, numResults);
+		result = result.subList(0, numResults);
+		log.debug("Property candidates: " + result);
+		return result;
 	}
 	
 	public void close() {

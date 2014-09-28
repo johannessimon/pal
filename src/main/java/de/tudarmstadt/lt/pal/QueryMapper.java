@@ -101,10 +101,10 @@ public class QueryMapper {
 			derivedTypeTrace.add("xsd:date (\"when\")");
 			typeURI = new MappedString("xsd:date", derivedTypeTrace);
 			break;
-		case Integer:
+		case Number:
 			basicType = TypeConstraint.BasicType.Literal;
-			derivedTypeTrace.add("xsd:integer (\"many\")");
-			typeURI = new MappedString("xsd:integer", derivedTypeTrace);
+			derivedTypeTrace.add("number (\"many\")");
+			typeURI = new MappedString("_number_", derivedTypeTrace);
 			break;
 		case Literal:
 			basicType = TypeConstraint.BasicType.Literal;

@@ -1,6 +1,7 @@
 ? ? ?	* * be|have|do // This never makes sense
 z ? ?	be|have subj *
 ? ? z	be|have dep *#w* // question words as predicate don't make sense
+? ? z	be|have prep *
 ? z z	be|have dep *
 z y y	* prep_of *
 y * z	*#n* prep *

@@ -116,14 +116,14 @@ public class StanfordTripleExtractor {
 					break;
 				}
 			}
-		}
 
-		// There must be at least a subject and an object (no matter if variable or constant),
-		// however the predicate may be a wildcard, i.e. null.
-		// Wildcard predicates will later be replaced by a specific predicate, e.g.
-		// the most common predicate between the subject and the object.
-		if (subject != null && object != null) {
-			triples.add(new StanfordTriple(subject, predicate, object));
+			// There must be at least a subject and an object (no matter if variable or constant),
+			// however the predicate may be a wildcard, i.e. null.
+			// Wildcard predicates will later be replaced by a specific predicate, e.g.
+			// the most common predicate between the subject and the object.
+			if (subject != null && object != null) {
+				triples.add(new StanfordTriple(subject, predicate, object));
+			}
 		}
 	}
 	

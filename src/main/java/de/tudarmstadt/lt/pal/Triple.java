@@ -99,7 +99,7 @@ public class Triple implements Cloneable {
 			Agent,
 			Date,
 			Place,
-			Integer,
+			Number,
 			Literal,
 			Unknown
 		}
