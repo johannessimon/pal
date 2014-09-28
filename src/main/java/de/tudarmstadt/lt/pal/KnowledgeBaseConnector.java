@@ -17,6 +17,7 @@ import java.util.Properties;
 import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Logger;
 
 import com.hp.hpl.jena.query.QueryExecution;
 import com.hp.hpl.jena.query.QuerySolution;
@@ -38,13 +39,15 @@ import de.tudarmstadt.lt.pal.util.StringUtil;
  */
 public class KnowledgeBaseConnector {
 	
+	Logger log = Logger.getLogger("de.tudarmstadt.lt.pal");
+	
 	String sparqlEndpoint;
 	Collection<String> graphUris;
 	String textIndexSearchPattern;
 	Map<String, Answer.DataType> dataTypeMappings;
 	
 	private boolean checkIfLocalUriNameIsValidSPARQL(String localName) {
-		String invalidPattern = ".*\\.|.*[\\&\\/\\(\\),%#].*";
+		String invalidPattern = ".*\\.|.*[\\&\\/\\(\\),%#':].*";
 		return !localName.matches(invalidPattern);
 	}
 	
@@ -65,7 +68,7 @@ public class KnowledgeBaseConnector {
 				if (checkIfLocalUriNameIsValidSPARQL(localName)) {
 					 return prefix + ":" + localName;
 				}/* else {
-					System.err.println("URI contains bad local name: " + uri);
+					log.debug("URI contains bad local name: " + uri);
 				}*/
 			}
 		}
@@ -83,19 +86,42 @@ public class KnowledgeBaseConnector {
 	Map<String, String> namespacePrefixes = new HashMap<String, String>();
 	
 	private void fillNamespacePrefixes() {
+		namespacePrefixes.put("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf");
+		namespacePrefixes.put("http://www.w3.org/2000/01/rdf-schema#", "rdfs");
+		namespacePrefixes.put("http://www.w3.org/2001/XMLSchema#", "xsd");
+		namespacePrefixes.put("http://www.w3.org/2002/07/owl#", "owl");
+		
 		namespacePrefixes.put("http://dbpedia.org/ontology/", "dbpedia-owl");
 		namespacePrefixes.put("http://dbpedia.org/property/", "dbpprop");
 		namespacePrefixes.put("http://dbpedia.org/resource/", "dbpedia");
 		namespacePrefixes.put("http://dbpedia.org/class/yago/", "yago");
 		namespacePrefixes.put("http://xmlns.com/foaf/0.1/", "foaf");
-		namespacePrefixes.put("http://www.w3.org/2001/XMLSchema#", "xsd");
-		namespacePrefixes.put("http://www.w3.org/2002/07/owl#", "owl");
-		namespacePrefixes.put("http://www.w3.org/2000/01/rdf-schema#", "rdfs");
-		namespacePrefixes.put("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf");
 		namespacePrefixes.put("http://jena.apache.org/text#", "text");
 		namespacePrefixes.put("http://purl.org/ontology/bibo/", "bibo");
 		namespacePrefixes.put("http://purl.org/ontology/mo/", "mo");
 		namespacePrefixes.put("http://schema.org/", "schema");
+	}
+	
+	/**
+	 * Lists namespaces that contain only RDF "meta" data (e.g. rdf:type or rdf:subClass).
+	 * Namespaces in this blacklist will be ignored when searching for property candidates.
+	 */
+	Set<String> namespaceBlacklist = new HashSet<String>();
+	
+	private void fillNamespaceBlacklist() {
+		namespaceBlacklist.add("http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+		namespaceBlacklist.add("http://www.w3.org/2000/01/rdf-schema#");
+		namespaceBlacklist.add("http://www.w3.org/2001/XMLSchema#");
+		namespaceBlacklist.add("http://www.w3.org/2002/07/owl#");
+	}
+	
+	private boolean uriIsBlacklisted(String uri) {
+		for (String blacklistedNS : namespaceBlacklist) {
+			if (uri.startsWith(blacklistedNS)) {
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	private String getNamespacePrefixDeclarations(String query) {
@@ -158,6 +184,7 @@ public class KnowledgeBaseConnector {
 	
 	private void init() {
 		fillNamespacePrefixes();
+		fillNamespaceBlacklist();
 		retrieveClassesInUse();
 		retrieveObjectProperties();
 		fillDataTypeMappings();
@@ -185,7 +212,7 @@ public class KnowledgeBaseConnector {
 		String from = getFromGraphDeclarations();
 		query = query.replace("WHERE", from + "\nWHERE");
 		query = getNamespacePrefixDeclarations(query) + "\n" + query;
-		System.out.println(query.replace("\n", " "));
+		log.debug("SPARQL query: " + query.replace("\n", " "));
 //		QueryExecution qexec = null;
 //		qexec = QueryExecutionFactory.sparqlService(sparqlEndpoint, query);
 		return new QueryEngineHTTP(sparqlEndpoint, query);
@@ -231,24 +258,30 @@ public class KnowledgeBaseConnector {
 		}
 	}
 	
-	// type -> number of entities with this type
-	Map<Resource, Integer> classesInUse;
+	// type URI -> number of entities with this type
+	Map<String, Integer> classesInUse;
 	Set<String> classesInUseSet;
 	private void retrieveClassesInUse() {
 		classesInUseSet = new HashSet<String>();
-		classesInUse = new HashMap<Resource, Integer>();
+		classesInUse = new HashMap<String, Integer>();
 //		String query = "SELECT DISTINCT ?t (COUNT(?s) AS ?count) WHERE {?s a ?t} GROUP BY ?t";
-		String query = "SELECT DISTINCT ?t WHERE {?s a ?t}";
+		String query = "PREFIX owl: <http://www.w3.org/2002/07/owl#>  SELECT ?t (COUNT(?t) as ?count)  WHERE { ?s a ?t } GROUP BY ?t ORDER BY DESC(?count) LIMIT 10000";
 		try {
 			QueryExecution qexec = getQueryExec(query);
 			ResultSet results = qexec.execSelect();
 			while (results.hasNext()) {
 				QuerySolution sol = results.next();
-				Resource classResource = sol.getResource("?t");
-//				int count = sol.getLiteral("?count").getInt();
-				classesInUse.put(classResource, null);
-				classesInUseSet.add(classResource.getURI());
+				RDFNode t = sol.get("?t");
+				if (t.isResource()) {
+					String classResourceUri = t.asResource().getURI();
+					int count = sol.getLiteral("?count").getInt();
+					classesInUse.put(classResourceUri, count);
+					classesInUseSet.add(classResourceUri);
+				} else {
+					log.warn("Query \"" + query + "\" for endpoint " + sparqlEndpoint + " returned a non-resource ?t: " + t);
+				}
 			}
+			log.info("Found " + classesInUseSet.size() + " classes in use for endpoint " + sparqlEndpoint);
 			qexec.close();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -361,19 +394,16 @@ public class KnowledgeBaseConnector {
 		for (ComparablePair<MappedString, Float> c : nameCandidates) {
 			String name = formatResourceName(c.key.value);
 //			for (Entry<Resource, Collection<String>> typeEntry : classesInUse.entrySet()) {
-			for (Resource type : classesInUse.keySet()) {
+			for (String typeUri : classesInUse.keySet()) {
 //				List<ComparablePair<MappedString, Float>> _thisTypeScores = new LinkedList<>();
 //				Resource type = typeEntry.getKey();
 //				Collection<String> labels = typeEntry.getValue();
-				String typeName = formatResourceName(getLocalName(type.getURI()));
+				String typeName = formatResourceName(getLocalName(typeUri));
 				if (StringUtil.hasPart(typeName, name)) {
 					float score = c.value * name.length() / (float)typeName.length();
-					if (Float.isNaN(score)) {
-						System.out.println("oops");
-					}
 					List<String> trace = new LinkedList<String>(c.key.trace);
-					trace.add(getSPARQLResourceString(type.getURI()) + " (URI match)");
-					MappedString mappedType = new MappedString(type.getURI(), trace);
+					trace.add(getSPARQLResourceString(typeUri) + " (URI match)");
+					MappedString mappedType = new MappedString(typeUri, trace);
 //					_thisTypeScores.add(new ComparablePair<>(mappedType, c.value * score));
 					types.add(new ComparablePair<MappedString, Float>(mappedType, score));
 //					continue;
@@ -412,23 +442,6 @@ public class KnowledgeBaseConnector {
 		return uri;
 	}
 	
-	public String getResourceLabel(String uri) {
-		String query = "SELECT ?label WHERE { { <" + uri + "> rdfs:label ?label } UNION { <" + uri + "> foaf:name ?label } . FILTER(lang(?label) = \"\" || langMatches(lang(?label), \"en\"))}";
-		try {
-			QueryExecution qexec = getQueryExec(query);
-			ResultSet results = qexec.execSelect();
-			for (; results.hasNext(); )
-			{
-				QuerySolution soln = results.nextSolution();
-				return soln.getLiteral("label").getString();
-			}
-			qexec.close();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return uri;
-	}
-	
 	Map<String, List<ComparablePair<MappedString, Float>>> resourceCandidateCache = new HashMap<String, List<ComparablePair<MappedString, Float>>>();
 	
 	List<ComparablePair<MappedString, Float>> getResourceCandidates(String name, int limit) {
@@ -436,7 +449,7 @@ public class KnowledgeBaseConnector {
 		if (candidates == null) {
 			candidates = new LinkedList<ComparablePair<MappedString, Float>>();
 			resourceCandidateCache.put(name, candidates);
-			System.out.println("Searching resources... [" + name + "]");
+			log.debug("Searching resources... [" + name + "]");
 			if (name.contains("#")) {
 				int sepIndex = name.indexOf('#');
 				name = name.substring(0, sepIndex);
@@ -487,7 +500,7 @@ public class KnowledgeBaseConnector {
 			}
 	
 			Collections.sort(candidates);
-			System.out.println("Done searching resources. Results: " + candidates);
+			log.debug("Done searching resources. Results: " + candidates);
 		}
 		return candidates;
 	}
@@ -675,7 +688,6 @@ public class KnowledgeBaseConnector {
 						Literal l = var.asLiteral();
 						varString = l.getValue().toString();
 					}
-//					System.out.println(varString);
 					res.add(varString);
 				}
 			}
@@ -734,8 +746,9 @@ public class KnowledgeBaseConnector {
 	}
 	
 	class PropertyCandidate {
-		Resource res;
+		String uri;
 		int count;
+		@Override public String toString() { return uri + " (" + count + ")"; } 
 	}
 	Map<List<Object>, Collection<PropertyCandidate>> propCandidateCache = new HashMap<List<Object>, Collection<PropertyCandidate>>();
 	
@@ -784,7 +797,7 @@ public class KnowledgeBaseConnector {
 				qexec = getQueryExec(query);
 				propPreCandidates = qexec.execSelect();
 			} catch (Exception e) {
-				System.err.println("Error while executing query: " + query);
+				log.error("Error while executing query: \"" + query + "\": " + e.getMessage());
 				return new LinkedList<ComparablePair<MappedString, Float>>();
 			}
 
@@ -795,8 +808,12 @@ public class KnowledgeBaseConnector {
 				if (pRes == null) {
 					break;
 				}
+				String pUri = pRes.getURI();
+				if (uriIsBlacklisted(pUri)) {
+					continue;
+				}
 				PropertyCandidate pc = new PropertyCandidate();
-				pc.res = pRes;
+				pc.uri = pUri;
 				pc.count = sol.getLiteral("count").getInt();
 				propCandidates.add(pc);
 			}
@@ -808,8 +825,7 @@ public class KnowledgeBaseConnector {
 
 		List<ComparablePair<MappedString, Float>> result = new LinkedList<ComparablePair<MappedString, Float>>();
 		for (PropertyCandidate pc : propCandidates) {
-			Resource pRes = pc.res;
-			String pUri = pRes.getURI();
+			String pUri = pc.uri;
 			int count = pc.count;
 			String pUriShortForm = getSPARQLResourceString(pUri);
 			// Assign a very small bonus for higher number of connections
@@ -831,7 +847,7 @@ public class KnowledgeBaseConnector {
 				propertyTypeScore = 1.01f;
 			}
 			
-			String pName = formatResourceName(pRes.getLocalName());
+			String pName = formatResourceName(getLocalName(pUri));
 			if (nameCandidates != null && !nameCandidates.isEmpty()) {
 				for (ComparablePair<MappedString, Float> candidate : nameCandidates) {
 					String candidateWord = candidate.key.value;
@@ -854,6 +870,6 @@ public class KnowledgeBaseConnector {
 	}
 	
 	public void close() {
-		System.out.println("Closing KB Connector. Number of queries: " + numQueries);
+		log.info("Closing KB Connector. Number of queries: " + numQueries);
 	}
 }
