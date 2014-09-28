@@ -5,7 +5,7 @@ z ? ?	be|have subj *
 z y y	* prep_of *
 y * z	*#n* prep *
 z y ?	* subj *
-x y z	* agent|obj|prep *
-? y z	* agent|obj|prep *
+x y z	* agent|comp|prep *
+? y z	* agent|comp|prep *
 ? y z	* dep *#w*
 ? ? z	* mod *

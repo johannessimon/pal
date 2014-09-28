@@ -558,6 +558,7 @@ public class KnowledgeBaseConnector {
 			}
 			qexec.close();
 		} catch (Exception e) {
+			log.error("Error executing SPARQL query \"" + queryStr.replace("\n", " ") + "\": " + e.getMessage());
 			e.printStackTrace();
 		}
 		return res;
