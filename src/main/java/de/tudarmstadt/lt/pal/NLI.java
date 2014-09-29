@@ -11,7 +11,8 @@ import de.tudarmstadt.lt.pal.stanford.StanfordPseudoQueryBuilder;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 
 /**
- * Simple front-end for PAL using the console.
+ * Simple front-end for PAL using the console. This is more meant as a playground than an end user
+ * interface.
  */
 public class NLI {
 	KnowledgeBaseConnector kb;

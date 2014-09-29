@@ -38,6 +38,9 @@ public class QueryMapper {
 		this.kb = kb;
 	}
 	
+	/**
+	 * Maps a triple element to candidate resources
+	 */
 	private Collection<ComparablePair<MappedString, Float>> mapResource(Element e) {
 		List<ComparablePair<MappedString, Float>> candidates = null;
 		
@@ -53,6 +56,9 @@ public class QueryMapper {
 		return candidates;
 	}
 	
+	/**
+	 * Maps a triple predicate to ontology property candidates
+	 */
 	private Collection<ComparablePair<MappedString, Float>> mapProperty(Element p, String subjectURI, String objectURI, TypeConstraint subjectTC, TypeConstraint objectTC) {
 		Map<MappedString, Float> synonyms = new HashMap<MappedString, Float>();
 		
@@ -79,6 +85,9 @@ public class QueryMapper {
 		return kb.getPropertyCandidates(nameCandidates, subjectURI, objectURI, subjectTC, objectTC);
 	}
 	
+	/**
+	 * Determines a variable's best-bet type
+	 */
 	private ComparablePair<TypeConstraint, Float> mapVariableType(Variable var) {
 		TypeConstraint.BasicType basicType = null;
 		MappedString typeURI = null;
@@ -136,11 +145,14 @@ public class QueryMapper {
 		return null;
 	}
 	
+	/**
+	 * Generates a list of candidates SPARQL queries from the given pseudo query and returns the first
+	 * query that yields any results (the latter being a way of filtering out non-sense queries)
+	 */
 	public Query getBestSPARQLQuery(Query pseudoQuery) {
 		List<ComparablePair<Query, Float>> queryCandidates = buildSPARQLQuery(pseudoQuery);
 		for (ComparablePair<Query, Float> query : queryCandidates) {
 			try {
-//				System.out.println("?" + pseudoQuery.focusVar.name + ":");
 				Collection<Answer> answer = kb.query(query.key);
 				if (!answer.isEmpty()) {
 					return query.key;
@@ -152,6 +164,9 @@ public class QueryMapper {
 		return null;
 	}
 	
+	/**
+	 * Generates candidates SPARQL queries from a specified pseudo query
+	 */
 	public List<ComparablePair<Query, Float>> buildSPARQLQuery(Query pseudoQuery) {
 		Query pseudoQueryWithTC = (Query)pseudoQuery.clone();
 		Query pseudoQueryWithoutTC = (Query)pseudoQuery.clone();
@@ -178,8 +193,6 @@ public class QueryMapper {
 	
 	private List<ComparablePair<Query, Float>> _buildSPARQLQuery(ComparablePair<Query, Float> scoredPseudoQuery) {
 		Query pseudoQuery = scoredPseudoQuery.key;
-//		System.out.println("Building sparql query for pseudo query:");
-//		System.out.println(pseudoQuery);
 		List<ComparablePair<Query, Float>> queryCandidates = new LinkedList<ComparablePair<Query, Float>>();
 		Query _baseQuery = (Query)pseudoQuery.clone();
 		_baseQuery.triples.clear();
@@ -209,6 +222,9 @@ public class QueryMapper {
 		return queryCandidates;
 	}
 	
+	/**
+	 * Maps a pseudo triple to a list of candidate SPARQL triples
+	 */
 	List<ComparablePair<Triple, Float>> buildSPARQLTriple(Triple triple, Query query) {
 		List<ComparablePair<Triple, Float>> res = new LinkedList<ComparablePair<Triple, Float>>();
 
