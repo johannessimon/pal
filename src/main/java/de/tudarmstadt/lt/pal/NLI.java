@@ -1,10 +1,9 @@
 package de.tudarmstadt.lt.pal;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
 
 import de.tudarmstadt.lt.pal.KnowledgeBaseConnector.Answer;
 import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
@@ -18,11 +17,12 @@ public class NLI {
 	KnowledgeBaseConnector kb;
 	QueryMapper tripleMapper;
 	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder();
-	StanfordDependencyParser depParser = new StanfordDependencyParser(/*"/Users/jsimon/No-Backup/stanford-parser-tmp"*/);
+	StanfordDependencyParser depParser = new StanfordDependencyParser();
 	
 	public NLI() {
 		try {
-			kb = new KnowledgeBaseConnector("src/main/resources/dbpedia-37-local.properties");
+			InputStream is = getClass().getClassLoader().getResourceAsStream("sparql_endpoints/dbpedia-37-local.properties");
+			kb = new KnowledgeBaseConnector(is);
 			tripleMapper = new QueryMapper(kb);
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -53,23 +53,9 @@ public class NLI {
 	}
 	
 	public Collection<Answer> run(String text) {
-		List<Answer> answers = new LinkedList<Answer>();
 		SemanticGraph dependencies = depParser.parse(text);
 		Query pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
-		System.out.println("PSEUDO QUERY: " + pseudoQuery);
-
 		Query query = tripleMapper.getBestSPARQLQuery(pseudoQuery);
-		System.out.println("QUERY: " + query);
-//		System.out.println("======= ANSWER =======");
-		try {
-//			String focusVar = pseudoQuery.focusVar.name;
-//			System.out.println("?" + focusVar + ":");
-			Collection<Answer> _answers = kb.query(query);
-			answers.addAll(_answers);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
-		return answers;
+		return kb.query(query);
 	}
 }

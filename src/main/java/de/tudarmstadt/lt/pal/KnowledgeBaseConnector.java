@@ -479,9 +479,9 @@ public class KnowledgeBaseConnector {
 							String shortUri = getSPARQLResourceString(r.getURI());
 							List<String> trace = new LinkedList<String>();
 							trace.add(name);
-							float labelScore = (float)StringUtil.longestCommonSubstring(name, rName).length() / rName.length();
+							float labelScore = rName.isEmpty() ? 0 : (float)StringUtil.longestCommonSubstring(name, rName).length() / rName.length();
 							String rNameFromURI = getResourceName(r.getURI());
-							float resourceNameScore = (float)StringUtil.longestCommonSubstring(name, rNameFromURI).length() / rNameFromURI.length();
+							float resourceNameScore = rNameFromURI.isEmpty() ? 0 : (float)StringUtil.longestCommonSubstring(name, rNameFromURI).length() / rNameFromURI.length();
 							float comboScore = labelScore * 0.5f + resourceNameScore * 0.5f;
 							// Assign penalty for inexact matches
 							float inexactMatchPenalty = 0.5f;

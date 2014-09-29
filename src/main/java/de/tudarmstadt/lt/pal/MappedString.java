@@ -3,6 +3,10 @@ package de.tudarmstadt.lt.pal;
 import java.util.LinkedList;
 import java.util.List;
 
+/**
+ * String that is mapped from one representation to another, possibly via multiple steps
+ * e.g. write -> author (synonym) -> dbpedia-owl:author (URI match)
+ */
 public class MappedString {
 	public String value;
 	public List<String> trace = new LinkedList<String>();
