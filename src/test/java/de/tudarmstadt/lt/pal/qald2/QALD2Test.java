@@ -18,6 +18,7 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -31,17 +32,15 @@ import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
 import de.tudarmstadt.lt.pal.stanford.StanfordPseudoQueryBuilder;
 import de.tudarmstadt.lt.pal.util.DateUtil;
 import de.tudarmstadt.lt.pal.util.ParallelParameterized;
-import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 
 @RunWith(ParallelParameterized.class)
 public class QALD2Test {
 	QALD2Entry entry;
-	KnowledgeBaseConnector kb;
-	QueryMapper tripleMapper;
-	StanfordCoreNLP pipeline;
-	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder();
-	StanfordDependencyParser depParser = new StanfordDependencyParser(/*"/Volumes/Bill/No-Backup/stanford-parser-tmp"*/);
+	static KnowledgeBaseConnector kb;
+	static QueryMapper tripleMapper;
+	static StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder();
+	static StanfordDependencyParser depParser = new StanfordDependencyParser();
 	private static float recall = 0.0f;
 	private static float precision = 0.0f;
 	private static int correctQuestions = 0;
@@ -50,6 +49,10 @@ public class QALD2Test {
 	
 	public QALD2Test(String question, QALD2Entry entry) throws IOException {
 		this.entry = entry;
+	}
+	
+	@BeforeClass
+	public static void init() throws IOException {
 		kb = new KnowledgeBaseConnector("src/main/resources/sparql_endpoints/dbpedia-37-local.properties");
 		tripleMapper = new QueryMapper(kb);
 	}

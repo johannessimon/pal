@@ -95,10 +95,14 @@ public class StanfordDependencyParser {
 			return readTree(cacheFile);
 		}
 		Annotation document = new Annotation(sentence);
-		if (pipeline == null) {
-			pipeline = new StanfordCoreNLP(props);
+		synchronized(this) {
+			if (pipeline == null) {
+				pipeline = new StanfordCoreNLP(props);
+			}
 		}
-		pipeline.annotate(document);
+		synchronized(pipeline) {
+			pipeline.annotate(document);
+		}
 		List<CoreMap> sentences = document.get(SentencesAnnotation.class);
 		
 		if (sentences == null || sentences.isEmpty()) {

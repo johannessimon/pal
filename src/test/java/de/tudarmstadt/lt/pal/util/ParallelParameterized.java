@@ -19,7 +19,7 @@ public class ParallelParameterized extends Parameterized {
 
         setScheduler(new RunnerScheduler() {
 
-            private final ExecutorService service = Executors.newFixedThreadPool(4);
+            private final ExecutorService service = Executors.newFixedThreadPool(8);
 
             public void schedule(Runnable childStatement) {
                 service.submit(childStatement);
