@@ -437,8 +437,17 @@ public class KnowledgeBaseConnector {
 		return formatResourceName(getLocalName(uri));
 	}
 	
+	/**
+	 * Cache for resource candidates
+	 * 
+	 * @see KnowledgeBaseConnector#getResourceCandidates(String, int)
+	 */
 	Map<String, List<ComparablePair<MappedString, Float>>> resourceCandidateCache = new HashMap<String, List<ComparablePair<MappedString, Float>>>();
 	
+	/**
+	 * Returns a list of resources matching the given <code>name</code>, limited to
+	 * <code>limit</code> results
+	 */
 	List<ComparablePair<MappedString, Float>> getResourceCandidates(String name, int limit) {
 		List<ComparablePair<MappedString, Float>> candidates = resourceCandidateCache.get(name);
 		if (candidates == null) {
@@ -556,6 +565,9 @@ public class KnowledgeBaseConnector {
 		return res;
 	}
 	
+	/**
+	 * Constructs a SPARQL query from the specified query, adding PREFIX and FROM declarations
+	 */
 	public String queryToSPARQLFull(Query q) {
 		String queryStr = queryToSPARQL(q);
 
@@ -565,7 +577,10 @@ public class KnowledgeBaseConnector {
 		
 		return queryStr;
 	}
-	
+
+	/**
+	 * Constructs a SPARQL query from the specified query, retrieving resource labels where possible
+	 */
 	public String queryToSPARQLWithLabel(Query q, int limit) {
 		String queryStr = "SELECT DISTINCT " + q.focusVar.sparqlString() + " (SAMPLE(?string) as ?_label) WHERE {\n";
 		for (Variable var : q.vars.values()) {
@@ -589,7 +604,10 @@ public class KnowledgeBaseConnector {
 		queryStr += "} GROUP BY " + q.focusVar.sparqlString() + " LIMIT " + limit;
 		return queryStr;
 	}
-	
+
+	/**
+	 * Constructs a SPARQL query from the specified query
+	 */
 	public String queryToSPARQL(Query q) {
 		String queryStr = "SELECT DISTINCT ?" + q.focusVar.name + " WHERE {\n";
 		for (Variable var : q.vars.values()) {
@@ -691,26 +709,6 @@ public class KnowledgeBaseConnector {
 		return res;
 	}
 	
-	private static Map<String, Set<String>> uriTypes = new HashMap<String, Set<String>>();
-	synchronized Set<String> getResourceTypes(String uri) {
-		Set<String> types = uriTypes.get(uri);
-		if (types == null) {
-			types = new HashSet<String>();
-			uriTypes.put(uri, types);
-			QueryExecution qexec;
-			ResultSet typeResults;
-			qexec = getQueryExec("SELECT ?t WHERE { <" + uri + "> a ?t }");
-			typeResults = qexec.execSelect();
-					
-			while (typeResults.hasNext()) {
-				QuerySolution sol = typeResults.next();
-				types.add(sol.getResource("t").getURI());
-			}
-			qexec.close();
-		}
-		return types;
-	}
-	
 	String getTypeConstraintSPARQLString(TypeConstraint tc, String varName) {
 		if (tc == null) {
 			return "";
@@ -730,18 +728,6 @@ public class KnowledgeBaseConnector {
 		}
 	}
 	
-	String getLuceneQueryString(Collection<ComparablePair<String, Float>> nameCandidates) {
-		StringBuilder query = new StringBuilder();
-		query.append("\"");
-		for (ComparablePair<String, Float> p : nameCandidates) {
-			String name = p.key;
-			query.append(name.replaceAll("_", " ").toLowerCase());
-			query.append(" ");
-		}
-		query.append("\"");
-		return query.toString();
-	}
-	
 	class PropertyCandidate {
 		String uri;
 		int count;
@@ -750,7 +736,8 @@ public class KnowledgeBaseConnector {
 	Map<List<Object>, Collection<PropertyCandidate>> propCandidateCache = new HashMap<List<Object>, Collection<PropertyCandidate>>();
 	
 	/**
-	 * nameCandidates must be sorted in ascending order
+	 * Retrieves a list of property candidates for the given nameCandidates, resources and type
+	 * constraints
 	 */
 	Collection<ComparablePair<MappedString, Float>> getPropertyCandidates(List<ComparablePair<MappedString, Float>> nameCandidates, String subjectURI, String objectURI,
 			                                                          TypeConstraint subjectTC, TypeConstraint objectTC) {
