@@ -24,31 +24,6 @@ public class Triple implements Cloneable {
 		public String toString() {
 			return name;
 		}
-
-		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = 1;
-			result = prime * result + ((name == null) ? 0 : name.hashCode());
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (this == obj)
-				return true;
-			if (obj == null)
-				return false;
-			if (getClass() != obj.getClass())
-				return false;
-			Element other = (Element) obj;
-			if (name == null) {
-				if (other.name != null)
-					return false;
-			} else if (!name.equals(other.name))
-				return false;
-			return true;
-		}
 		
 		@Override
 		public Object clone() {
@@ -158,43 +133,5 @@ public class Triple implements Cloneable {
 	 */
 	public String toString() {
 		return "[Subject: " + subject + "] [Predicate: " + predicate + "] [Object: " + object + "]";
-	}
-
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((object == null) ? 0 : object.hashCode());
-		result = prime * result
-				+ ((predicate == null) ? 0 : predicate.hashCode());
-		result = prime * result + ((subject == null) ? 0 : subject.hashCode());
-		return result;
-	}
-
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		Triple other = (Triple) obj;
-		if (object == null) {
-			if (other.object != null)
-				return false;
-		} else if (!object.equals(other.object))
-			return false;
-		if (predicate == null) {
-			if (other.predicate != null)
-				return false;
-		} else if (!predicate.equals(other.predicate))
-			return false;
-		if (subject == null) {
-			if (other.subject != null)
-				return false;
-		} else if (!subject.equals(other.subject))
-			return false;
-		return true;
 	}
 }
