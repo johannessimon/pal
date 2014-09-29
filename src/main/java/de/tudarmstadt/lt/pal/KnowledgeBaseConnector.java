@@ -35,7 +35,7 @@ import de.tudarmstadt.lt.pal.util.ComparablePair;
 import de.tudarmstadt.lt.pal.util.StringUtil;
 
 /**
- * Basic interface to ontology and triple store
+ * Interface for PAL to talk to SPARQL endpoints. A lot of the PAL "business logic" sits here.
  */
 public class KnowledgeBaseConnector {
 	
@@ -44,17 +44,22 @@ public class KnowledgeBaseConnector {
 	String sparqlEndpoint;
 	Collection<String> graphUris;
 	String textIndexSearchPattern;
-	Map<String, Answer.DataType> dataTypeMappings;
 	
+	/**
+	 * Checks if a local name qualifies for being abbreviated with one of the available prefixes
+	 * (e.g. "dbpedia:Dan_Brown"). Some URIs do not qualify because they contain unescaped
+	 * characters listed below (e.g. an apostrophe, that is e.g.
+	 * "http://dbpedia.org/resource/Dan_Brown's_friend"). URIs that do not qualify will be written
+	 * out in full and enclosed in <...>
+	 */
 	private boolean checkIfLocalUriNameIsValidSPARQL(String localName) {
 		String invalidPattern = ".*\\.|.*[\\&\\/\\(\\),%#':].*";
 		return !localName.matches(invalidPattern);
 	}
 	
 	/**
-	 * Returns a short representation of the resource's URI using
-	 * known namespace prefixes. Uses <code>?varName</code> instead
-	 * if resource is null
+	 * Returns a short representation of the resource's URI using known namespace prefixes.
+	 * Uses <code>?varName</code> instead if resource is null
 	 */
 	public String getSPARQLResourceString(String uri) {
 		for (Entry<String, String> namespacePrefix : namespacePrefixes.entrySet()) {
@@ -81,7 +86,10 @@ public class KnowledgeBaseConnector {
 	 * Maps namespace -> prefix
 	 */
 	Map<String, String> namespacePrefixes = new HashMap<String, String>();
-	
+
+	/**
+	 * @see KnowledgeBaseConnector#namespacePrefixes
+	 */
 	private void fillNamespacePrefixes() {
 		namespacePrefixes.put("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf");
 		namespacePrefixes.put("http://www.w3.org/2000/01/rdf-schema#", "rdfs");
@@ -105,7 +113,10 @@ public class KnowledgeBaseConnector {
 	 * Namespaces in this blacklist will be ignored when searching for property candidates.
 	 */
 	Set<String> namespaceBlacklist = new HashSet<String>();
-	
+
+	/**
+	 * @see KnowledgeBaseConnector#namespaceBlacklist
+	 */
 	private void fillNamespaceBlacklist() {
 		namespaceBlacklist.add("http://www.w3.org/1999/02/22-rdf-syntax-ns#");
 		namespaceBlacklist.add("http://www.w3.org/2000/01/rdf-schema#");
@@ -113,6 +124,9 @@ public class KnowledgeBaseConnector {
 		namespaceBlacklist.add("http://www.w3.org/2002/07/owl#");
 	}
 	
+	/**
+	 * @see KnowledgeBaseConnector#namespaceBlacklist
+	 */
 	private boolean uriIsBlacklisted(String uri) {
 		for (String blacklistedNS : namespaceBlacklist) {
 			if (uri.startsWith(blacklistedNS)) {
@@ -122,6 +136,9 @@ public class KnowledgeBaseConnector {
 		return false;
 	}
 	
+	/**
+	 * Constructs the SPARQL prefix declarations from <code>namespacePrefixes</code> map
+	 */
 	private String getNamespacePrefixDeclarations(String query) {
 		StringBuilder res = new StringBuilder();
 		for (Entry<String, String> entry : namespacePrefixes.entrySet()) {
@@ -137,7 +154,10 @@ public class KnowledgeBaseConnector {
 		}
 		return res.toString();
 	}
-	
+
+	/**
+	 * Constructs the SPARQL "FROM" declarations from <code>graphUris</code> map
+	 */
 	private String getFromGraphDeclarations() {
 		StringBuilder res = new StringBuilder();
 		if (graphUris != null) {
@@ -150,10 +170,16 @@ public class KnowledgeBaseConnector {
 		return res.toString();
 	}
 	
+	/**
+	 * Initializes a new KnowledgeBaseConnector using the specified .properties file
+	 */
 	public KnowledgeBaseConnector(String file) throws IOException {
 		this(new FileInputStream(file));
 	}
-	
+
+	/**
+	 * Initializes a new KnowledgeBaseConnector using the specified input stream of .properties file
+	 */
 	public KnowledgeBaseConnector(InputStream propertiesFile) throws IOException {
 		Properties props = new Properties();
 		props.load(propertiesFile);
@@ -176,6 +202,18 @@ public class KnowledgeBaseConnector {
 		init();
 	}
 	
+	/**
+	 * Initialized a new KnowledgeBaseConnector using the explicitly specified configuration
+	 */
+	public KnowledgeBaseConnector(String sparqlEndpoint, Collection<String> graphURIs, String textIndexSearchPattern) {
+		this.sparqlEndpoint = sparqlEndpoint;
+		init();
+	}
+	
+	/**
+	 * Fills out the configuration-provided text search pattern
+	 * Example: $x <bif:contains> "'$text'" --> ?label <bif:contains> "'some text'"
+	 */
 	String fillTextIndexSearchPattern(String pattern, String x, String text) {
 		return pattern.replace("$x", x).replace("$text", text);
 	}
@@ -187,7 +225,15 @@ public class KnowledgeBaseConnector {
 		retrieveObjectProperties();
 		fillDataTypeMappings();
 	}
+
+	/**
+	 * Maps XML schema data types to an Answer.DataType
+	 */
+	Map<String, Answer.DataType> dataTypeMappings;
 	
+	/**
+	 * @see KnowledgeBaseConnector#dataTypeMappings
+	 */
 	private void fillDataTypeMappings() {
 		dataTypeMappings = new HashMap<String, DataType>();
 		dataTypeMappings.put(null, Answer.DataType.String); // "pure" literals (no xsd:string)
@@ -200,11 +246,6 @@ public class KnowledgeBaseConnector {
 		dataTypeMappings.put("http://www.w3.org/2001/XMLSchema#boolean", Answer.DataType.Boolean);
 	}
 	
-	public KnowledgeBaseConnector(String sparqlEndpoint, Collection<String> graphURIs, String textIndexSearchPattern) {
-		this.sparqlEndpoint = sparqlEndpoint;
-		init();
-	}
-	
 	private QueryExecution getQueryExec(String query) {
 		numQueries++;
 		String from = getFromGraphDeclarations();
@@ -215,24 +256,13 @@ public class KnowledgeBaseConnector {
 	}
 	
 	/**
-	 * Formats typical ontology type names like "EuropeanCapital123" in a more
-	 * natural-language conformant format ("european capital")
+	 * A set of all owl:ObjectProperties provided by the SPARQL endpoint
 	 */
-	private String formatResourceName(String name) {
-		StringBuilder formattedName = new StringBuilder();
-		for (int i = 0; i < name.length(); i++) {
-			char c = name.charAt(i);
-			if (i > 0 && (Character.isUpperCase(c) || c == '_' || c == '-')) {
-				formattedName.append(' ');
-			}
-			if (Character.isLetter(c)) {
-				formattedName.append(Character.toLowerCase(c));
-			}
-		}
-		return formattedName.toString();
-	}
-	
 	Set<String> objectProperties;
+	
+	/**
+	 * @see KnowledgeBaseConnector#objectProperties
+	 */
 	private void retrieveObjectProperties() {
 		objectProperties = new HashSet<String>();
 		String query = "SELECT DISTINCT ?t WHERE { ?t a owl:ObjectProperty }";
@@ -245,14 +275,26 @@ public class KnowledgeBaseConnector {
 				objectProperties.add(objectProperty.getURI());
 			}
 			qexec.close();
+			log.info("Found " + objectProperties.size() + " object properties for endpoint " + sparqlEndpoint);
 		} catch (Exception e) {
+			log.error("Error retrieving list of object properties: " + e.getMessage());
 			e.printStackTrace();
 		}
 	}
 	
-	// type URI -> number of entities with this type
+	/**
+	 *  type URI -> number of entities with this type
+	 */
 	Map<String, Integer> classesInUse;
+	
+	/**
+	 * @see KnowledgeBaseConnector#classesInUse
+	 */
 	Set<String> classesInUseSet;
+	
+	/**
+	 * @see KnowledgeBaseConnector#classesInUse
+	 */
 	private void retrieveClassesInUse() {
 		classesInUseSet = new HashSet<String>();
 		classesInUse = new HashMap<String, Integer>();
@@ -294,11 +336,17 @@ public class KnowledgeBaseConnector {
 		}
 		return 0;
 	}*/
-	
+
+	/**
+	 * @see KnowledgeBaseConnector#classesInUse
+	 */
 	public boolean resourceIsClass(String uri) {
 		return classesInUseSet.contains(uri);
 	}
 	
+	/**
+	 * Returns either the best-matching type for the name candidates or null
+	 */
 	ComparablePair<MappedString, Float> getType(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
 		List<ComparablePair<MappedString, Float>> candidates = getTypeCandidates(nameCandidates);
 		float bestScore = 0.0f;
@@ -322,15 +370,10 @@ public class KnowledgeBaseConnector {
 		return null;
 	}
 	
-	private String getLocalName(String uri) {
-		char sep = '/';
-		if (uri.contains("#")) {
-			sep = '#';
-		}
-		int index = uri.lastIndexOf(sep);
-		return uri.substring(index + 1);
-	}
-	
+	/**
+	 * Constructs a list of type candidates from {@link KnowledgeBaseConnector#classesInUse} that
+	 * match the name candidates
+	 */
 	private List<ComparablePair<MappedString, Float>> getTypeCandidates(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
 		log.debug("Searching types for name candidates: " + nameCandidates);
 		List<ComparablePair<MappedString, Float>> types = new LinkedList<ComparablePair<MappedString, Float>>();
@@ -352,16 +395,46 @@ public class KnowledgeBaseConnector {
 		return types;
 	}
 	
-	private String getResourceName(String uri) {
-		uri = uri.replace('_', ' ');
-		if(uri.contains("#")) {
-			int sepIndex = uri.lastIndexOf("#");
-			return uri.substring(sepIndex + 1);
-		} else if (uri.contains("/")) {
-			int sepIndex = uri.lastIndexOf("/");
-			return uri.substring(sepIndex + 1);
+	/**
+	 * Formats typical ontology type names like "EuropeanCapital123" in a more natural-language
+	 * conformant format ("european capital")
+	 */
+	private String formatResourceName(String name) {
+		StringBuilder formattedName = new StringBuilder();
+		for (int i = 0; i < name.length(); i++) {
+			char c = name.charAt(i);
+			if (i > 0 && (Character.isUpperCase(c) || c == '_' || c == '-')) {
+				formattedName.append(' ');
+			}
+			if (Character.isLetter(c)) {
+				formattedName.append(Character.toLowerCase(c));
+			}
 		}
-		return uri;
+		return formattedName.toString();
+	}
+	
+	/**
+	 * Extracts the local name of a URI, e.g.
+	 * dbpedia.org/resource/Dan_Brown -> Dan_Brown
+	 * http://www.w3.org/2001/XMLSchema#string -> string
+	 */
+	private String getLocalName(String uri) {
+		char sep = '/';
+		if (uri.contains("#")) {
+			sep = '#';
+		}
+		int index = uri.lastIndexOf(sep);
+		return uri.substring(index + 1);
+	}
+	
+	/**
+	 * Convenience method that formats the local name extracted from the URI
+	 * 
+	 * @see KnowledgeBaseConnector#formatResourceName(String)
+	 * @see KnowledgeBaseConnector#getLocalName(String)
+	 */
+	private String getResourceName(String uri) {
+		return formatResourceName(getLocalName(uri));
 	}
 	
 	Map<String, List<ComparablePair<MappedString, Float>>> resourceCandidateCache = new HashMap<String, List<ComparablePair<MappedString, Float>>>();
