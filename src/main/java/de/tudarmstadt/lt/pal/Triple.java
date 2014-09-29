@@ -62,6 +62,11 @@ public class Triple implements Cloneable {
 		}
 	}
 	
+	/**
+	 * A type constraint for a variable (or resource), which distinguishes between "resource" and
+	 * "literal", as well as a specific URI for the type, e.g. (BasicType.Literal, xsd:date) or
+	 * (BasicType.Resource, bibo:Book)
+	 */
 	public static class TypeConstraint {
 		public enum BasicType {
 			Resource,
@@ -81,6 +86,11 @@ public class Triple implements Cloneable {
 		}
 	}
 	
+	/**
+	 * A triple element that is no variable,
+	 * e.g. "dbpedia:Dan_Brown" and "dbpedia-owl:author" in
+	 * [dbpedia:Dan_Brown dbpedia-owl:author ?book]
+	 */
 	public static class Constant extends Element {
 		public String type;
 		
@@ -94,6 +104,9 @@ public class Triple implements Cloneable {
 		}
 	}
 	
+	/**
+	 * A variable, e.g. "?book" in [dbpedia:Dan_Brown dbpedia-owl:author ?book]
+	 */
 	public static class Variable extends Element {
 		public enum Type {
 			Agent,
@@ -140,6 +153,9 @@ public class Triple implements Cloneable {
 		object = o;
 	}
 	
+	/**
+	 * Produces a human-readable representation of this triple. Not meant for SPARQL etc.
+	 */
 	public String toString() {
 		return "[Subject: " + subject + "] [Predicate: " + predicate + "] [Object: " + object + "]";
 	}
