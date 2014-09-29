@@ -76,7 +76,6 @@ public class QALD2Test {
 		Set<String> answers = new HashSet<String>();
 		SemanticGraph dependencies = depParser.parse(entry.question);
 		Query pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
-		System.out.println(pseudoQuery);
 		assertTrue(pseudoQuery.triples != null);
 		assertTrue(pseudoQuery.triples.size() > 0);
 		assertTrue(pseudoQuery.vars != null);
@@ -84,11 +83,7 @@ public class QALD2Test {
 		assertTrue(pseudoQuery.focusVar != null);
 		Query query = tripleMapper.getBestSPARQLQuery(pseudoQuery);
 		assertTrue(query != null);
-		System.out.println("QUERY: " + query);
-		System.out.println("======= ANSWER =======");
-		String focusVar = pseudoQuery.focusVar.name;
 		try {
-			System.out.println("?" + focusVar + ":");
 			Collection<Answer> queryAnswers = kb.query(query);
 			for (Answer a : queryAnswers) {
 				answers.add(a.value);
@@ -156,7 +151,6 @@ public class QALD2Test {
 			// This is a parse error on the JUnit side, we don't want this to show up as "error"
 			fail();
 		}
-		System.out.println("oops");
 		fail();
 	}
 	

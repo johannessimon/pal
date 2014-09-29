@@ -13,7 +13,7 @@ import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.semgraph.SemanticGraph;
-import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.CollapsedCCProcessedDependenciesAnnotation;
+import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.CollapsedDependenciesAnnotation;
 import edu.stanford.nlp.util.CoreMap;
 
 /**
@@ -110,7 +110,7 @@ public class StanfordDependencyParser {
 		}
 		
 		CoreMap firstSentence = sentences.get(0);
-		SemanticGraph dependencies = firstSentence.get(CollapsedCCProcessedDependenciesAnnotation.class);
+		SemanticGraph dependencies = firstSentence.get(CollapsedDependenciesAnnotation.class);
 		
 		if (cacheFile != null) {
 			writeTree(dependencies, cacheFile);

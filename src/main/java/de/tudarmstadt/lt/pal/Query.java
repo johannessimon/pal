@@ -45,7 +45,13 @@ public class Query {
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
-		sb.append("SELECT * WHERE {\n");
+		sb.append("SELECT ");
+		if (focusVar != null) {
+			sb.append(focusVar.sparqlString());
+		} else {
+			sb.append("*");
+		}
+		sb.append(" WHERE {\n");
 		for(Triple t : triples) {
 			sb.append("   ");
 			sb.append(t);

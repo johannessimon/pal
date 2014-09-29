@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
+
 import de.tudarmstadt.lt.pal.Query;
 import de.tudarmstadt.lt.pal.Triple;
 import de.tudarmstadt.lt.pal.Triple.Constant;
@@ -22,6 +24,7 @@ import edu.stanford.nlp.semgraph.SemanticGraphEdge;
 public class StanfordPseudoQueryBuilder {
 	StanfordTripleExtractor tripleExtactor = new StanfordTripleExtractor();
 	Set<String> ignoredWords = new HashSet<String>();
+	Logger log = Logger.getLogger("de.tudarmstadt.lt.pal");
 	
 	public StanfordPseudoQueryBuilder() {
 		// quantity words (e.g. in "How many films ...")
@@ -44,7 +47,6 @@ public class StanfordPseudoQueryBuilder {
 			Element subject = nodeToSPARQLElement(dependencies, t.subject, variables, typeConstraints, false);
 			Element predicate = nodeToSPARQLElement(dependencies, t.predicate, variables, typeConstraints, true);
 			Element object = nodeToSPARQLElement(dependencies, t.object, variables, typeConstraints, false);
-//			System.out.println("[Subject: " + subject + "] [Predicate: " + predicate + "] [Object: " + object + "]");
 			queryTriples.add(new Triple(subject, predicate, object));
 		}
 		Variable focusVariable = variables.get(tripleExtactor.getFocusWord());
@@ -64,6 +66,7 @@ public class StanfordPseudoQueryBuilder {
 		pseudoQuery.triples = queryTriples;
 		pseudoQuery.vars = vars;
 		pseudoQuery.focusVar = focusVariable;
+		log.info("Pseudo query:  " + pseudoQuery);
 		return pseudoQuery;
 	}
 	

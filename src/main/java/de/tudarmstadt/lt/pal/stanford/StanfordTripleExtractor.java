@@ -71,6 +71,7 @@ public class StanfordTripleExtractor {
 		}
 		if (StanfordUtil.wordIsProperNoun(deps, y)) {
 			// Constant elements are never subject of any triples (only object)
+			// --> do not process children of constant elements
 			return;
 		}
 		
@@ -81,6 +82,11 @@ public class StanfordTripleExtractor {
 		IndexedWord predicate = null;
 		IndexedWord object = null;
 		for (IndexedWord z : children) {
+			// Avoid recursive edges (self-loops). Note: IndexWord's with same index must not be
+			// the same object (therefore compare index)
+			if (z.index() == y.index()) {
+				continue;
+			}
 			handleNode(z, depth + 1);
 			if (ignoreWord(y) || ignoreWord(z)) {
 				continue;
