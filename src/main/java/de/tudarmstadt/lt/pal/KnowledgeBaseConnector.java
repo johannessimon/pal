@@ -28,6 +28,7 @@ import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.sparql.engine.http.QueryEngineHTTP;
 
 import de.tudarmstadt.lt.pal.KnowledgeBaseConnector.Answer.DataType;
+import de.tudarmstadt.lt.pal.MappedString.TraceElement;
 import de.tudarmstadt.lt.pal.Triple.TypeConstraint;
 import de.tudarmstadt.lt.pal.Triple.TypeConstraint.BasicType;
 import de.tudarmstadt.lt.pal.Triple.Variable;
@@ -277,8 +278,7 @@ public class KnowledgeBaseConnector {
 			qexec.close();
 			log.info("Found " + objectProperties.size() + " object properties for endpoint " + sparqlEndpoint);
 		} catch (Exception e) {
-			log.error("Error retrieving list of object properties: " + e.getMessage());
-			e.printStackTrace();
+			log.error("Error retrieving list of object properties: ", e);
 		}
 	}
 	
@@ -299,6 +299,7 @@ public class KnowledgeBaseConnector {
 		classesInUseSet = new HashSet<String>();
 		classesInUse = new HashMap<String, Integer>();
 		String query = "SELECT ?t (COUNT(?t) as ?count)  WHERE { ?s a ?t } GROUP BY ?t ORDER BY DESC(?count) LIMIT 10000";
+		log.debug("Retrieving classes in use for endpoint " + sparqlEndpoint);
 		try {
 			QueryExecution qexec = getQueryExec(query);
 			ResultSet results = qexec.execSelect();
@@ -317,25 +318,9 @@ public class KnowledgeBaseConnector {
 			log.info("Found " + classesInUseSet.size() + " classes in use for endpoint " + sparqlEndpoint);
 			qexec.close();
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("Failed to retrieve classes in use for endpoint " + sparqlEndpoint + ": ", e);
 		}
 	}
-	/*
-	private int getClassCount(String rUri) {
-		String query = "SELECT DISTINCT (COUNT(?s) AS ?count) WHERE {?s a <" + rUri + ">}";
-		try {
-			QueryExecution qexec = getQueryExec(query);
-			ResultSet results = qexec.execSelect();
-			while (results.hasNext()) {
-				QuerySolution sol = results.next();
-				return sol.getLiteral("?count").getInt();
-			}
-			qexec.close();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return 0;
-	}*/
 
 	/**
 	 * @see KnowledgeBaseConnector#classesInUse
@@ -383,8 +368,8 @@ public class KnowledgeBaseConnector {
 				String typeName = formatResourceName(getLocalName(typeUri));
 				if (StringUtil.hasPart(typeName, name)) {
 					float score = c.value * name.length() / (float)typeName.length();
-					List<String> trace = new LinkedList<String>(c.key.trace);
-					trace.add(getSPARQLResourceString(typeUri) + " (URI match)");
+					List<TraceElement> trace = new LinkedList<TraceElement>(c.key.trace);
+					trace.add(new TraceElement(getSPARQLResourceString(typeUri) + " (URI match)", typeUri));
 					MappedString mappedType = new MappedString(typeUri, trace);
 					types.add(new ComparablePair<MappedString, Float>(mappedType, score));
 				}
@@ -477,8 +462,8 @@ public class KnowledgeBaseConnector {
 						Resource r = soln.getResource("subject");
 						if (r != null) {
 							String shortUri = getSPARQLResourceString(r.getURI());
-							List<String> trace = new LinkedList<String>();
-							trace.add(name);
+							List<TraceElement> trace = new LinkedList<TraceElement>();
+							trace.add(new TraceElement(name, ""));
 							float labelScore = rName.isEmpty() ? 0 : (float)StringUtil.longestCommonSubstring(name, rName).length() / rName.length();
 							String rNameFromURI = getResourceName(r.getURI());
 							float resourceNameScore = rNameFromURI.isEmpty() ? 0 : (float)StringUtil.longestCommonSubstring(name, rNameFromURI).length() / rNameFromURI.length();
@@ -487,16 +472,16 @@ public class KnowledgeBaseConnector {
 							float inexactMatchPenalty = 0.5f;
 							if (comboScore < 1.0f) {
 								comboScore = comboScore * inexactMatchPenalty;
-								trace.add(shortUri + " (partial match)");
+								trace.add(new TraceElement(shortUri + " (partial match)", r.getURI()));
 							} else {
-								trace.add(shortUri + " (exact match)");
+								trace.add(new TraceElement(shortUri + " (exact match)", r.getURI()));
 							}
 							candidates.add(new ComparablePair<MappedString, Float>(new MappedString(shortUri, trace), comboScore));
 						}
 					}
 					qexec.close();
 				} catch (Exception e) {
-					e.printStackTrace();
+					log.error("Failed to retrieve resource candidates from SPARQL endpoint.", e);
 				}
 			}
 	
@@ -559,8 +544,7 @@ public class KnowledgeBaseConnector {
 			}
 			qexec.close();
 		} catch (Exception e) {
-			log.error("Error executing SPARQL query \"" + queryStr.replace("\n", " ") + "\": " + e.getMessage());
-			e.printStackTrace();
+			log.error("Error executing SPARQL query \"" + queryStr.replace("\n", " ") + "\". ", e);
 		}
 		return res;
 	}
@@ -660,7 +644,7 @@ public class KnowledgeBaseConnector {
 			}
 			qexec.close();
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("Failed to execute query \"" + queryString + "\":", e);
 		}
 		return res;
 	}
@@ -704,7 +688,7 @@ public class KnowledgeBaseConnector {
 			}
 			qexec.close();
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("Failed to execute query \"" + queryString + "\":", e);
 		}
 		return res;
 	}
@@ -838,12 +822,12 @@ public class KnowledgeBaseConnector {
 					if (StringUtil.hasPartStartingWith(pName, candidateWord)) {
 						float score = (float)candidateWord.length() / pName.length() * candidate.value * propertyTypeScore + countScoreBonus;
 						MappedString mappedPUri = new MappedString(pUriShortForm, candidate.key.trace);
-						mappedPUri.trace.add(pUriShortForm + " (URI match)");
+						mappedPUri.trace.add(new TraceElement(pUriShortForm + " (URI match)", pUri));
 						result.add(new ComparablePair<MappedString, Float>(mappedPUri, score));
 					}
 				}
 			} else {
-				MappedString mappedPUri = new MappedString(pUriShortForm);
+				MappedString mappedPUri = new MappedString(pUriShortForm, Arrays.asList(new TraceElement(pUriShortForm, pUri)));
 				result.add(new ComparablePair<MappedString, Float>(mappedPUri, propertyTypeScore + countScoreBonus));
 			}
 		}

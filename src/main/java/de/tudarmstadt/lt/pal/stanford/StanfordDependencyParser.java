@@ -1,13 +1,17 @@
 package de.tudarmstadt.lt.pal.stanford;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.List;
 import java.util.Properties;
+
+import org.apache.log4j.Logger;
 
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.pipeline.Annotation;
@@ -17,12 +21,14 @@ import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.CollapsedDependenc
 import edu.stanford.nlp.util.CoreMap;
 
 /**
- * Interface to stanford dependency parser, uses file-based parse caching
+ * Interface to stanford dependency parser, capable of using file-based parse caching
  */
 public class StanfordDependencyParser {
 	Properties props;
 	StanfordCoreNLP pipeline = null;
 	File tmpDir;
+	
+	Logger log = Logger.getLogger("de.tudarmstadt.lt.pal");
 	
 	public StanfordDependencyParser() {
 		tmpDir = null;
@@ -116,6 +122,39 @@ public class StanfordDependencyParser {
 			writeTree(dependencies, cacheFile);
 		}
 		
+		log.debug("Dependency parse tree for sentence \"" + sentence + "\":");
+		log.debug(dependencies.toDotFormat());
+		
 		return dependencies;
+	}
+	
+	public void runInteractive() {
+		if (pipeline == null) {
+			pipeline = new StanfordCoreNLP(props);
+		}
+		
+		BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+
+		try {
+			while(true) {
+				System.out.print("Q: ");
+				String sentence = in.readLine();
+				if (sentence == null) {
+					break;
+				}
+				SemanticGraph res = parse(sentence);
+				if (res != null) {
+					System.out.println(res.toDotFormat());
+				} else {
+					System.out.println("Unable to parse!");
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static void main(String[] args) {
+		new StanfordDependencyParser().runInteractive();
 	}
 }

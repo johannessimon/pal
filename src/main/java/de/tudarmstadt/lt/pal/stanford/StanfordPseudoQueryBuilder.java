@@ -37,7 +37,7 @@ public class StanfordPseudoQueryBuilder {
 	/**
 	 * Build a pseudo query from the given dependency tree
 	 */
-	public Query buildPseudoQuery(SemanticGraph dependencies) {
+	public synchronized Query buildPseudoQuery(SemanticGraph dependencies) {
 		// extractTriples() will add focus words to passed focusWords set
 		Set<StanfordTriple> triples = tripleExtactor.extractTriples(dependencies);
 		Map<IndexedWord, IndexedWord> typeConstraints = tripleExtactor.typeConstraints;

@@ -2,7 +2,6 @@ package de.tudarmstadt.lt.pal.wordnet;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -12,6 +11,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import de.tudarmstadt.lt.pal.MappedString;
+import de.tudarmstadt.lt.pal.MappedString.TraceElement;
 import de.tudarmstadt.lt.pal.util.ComparablePair;
 import de.tudarmstadt.lt.pal.util.StringUtil;
 import edu.mit.jwi.Dictionary;
@@ -48,7 +48,7 @@ public class WordNetConnector {
 	}
 	
 
-	public void addSynonym(Map<MappedString, Float> synonymScores, String synonym, List<String> trace, float score) {
+	public void addSynonym(Map<MappedString, Float> synonymScores, String synonym, List<TraceElement> trace, float score) {
 		MappedString mappedWord = new MappedString(synonym, trace);
 		addSynonym(synonymScores, mappedWord, score);
 	}
@@ -94,10 +94,10 @@ public class WordNetConnector {
 			if (idxWord == null) {
 				continue;
 			}
-			List<String> trace = new LinkedList<String>();
-			trace.add(word);
+			List<TraceElement> trace = new LinkedList<TraceElement>();
+			trace.add(new TraceElement(word, ""));
 			if (!partialWord.key.equals(word)) {
-				trace.add(idxWord.getLemma() + " (partial word)");
+				trace.add(new TraceElement(idxWord.getLemma() + " (partial word)", ""));
 			}
 			for (IWordID wordID : idxWord.getWordIDs()) {
 				IWord w;
@@ -115,57 +115,65 @@ public class WordNetConnector {
 		return synonymScores;
 	}
 	
-	public Map<MappedString, Float> getRelatedWords(String word, String posStr) {
-		Map<MappedString, Float> synonymScores = new HashMap<MappedString, Float>();
-		POS pos = posFromString(posStr);
-		if (pos == null) {
-			return new HashMap<MappedString, Float>();
-		}
-		List<String> trace = Arrays.asList(word);
-		Collection<ComparablePair<String, Float>> partialWords = StringUtil.getPartialMainWords(word);
-		for (ComparablePair<String, Float> partialWord : partialWords) {
-			float factor = partialWord.value;
-			IIndexWord idxWord;
-			synchronized (dict) {
-				idxWord = dict.getIndexWord(partialWord.key, pos);
+	Map<String, Map<MappedString, Float>> relatedWordsCache = new HashMap<String, Map<MappedString, Float>>();
+	
+	public synchronized Map<MappedString, Float> getRelatedWords(String word, String posStr) {
+		String cacheKey = word + "#" + posStr;
+		Map<MappedString, Float> synonymScores = relatedWordsCache.get(cacheKey);
+		if (synonymScores == null) {
+			synonymScores = new HashMap<MappedString, Float>();
+			relatedWordsCache.put(cacheKey, synonymScores);
+			POS pos = posFromString(posStr);
+			if (pos == null) {
+				return new HashMap<MappedString, Float>();
 			}
-			if (idxWord == null) {
-				continue;
-			}
-			// Use hypernyms to find related words, but assign a penalty
-			// as hypernyms are a "bad" way to find synonyms
-			// (human is not a synonym of author, but the other way around)
-			float hypernymPenalty = 0.1f;
-			for (IWordID wordID : idxWord.getWordIDs()) {
-				IWord w;
+			List<TraceElement> trace = new LinkedList<TraceElement>();
+			trace.add(new TraceElement(word, ""));
+			Collection<ComparablePair<String, Float>> partialWords = StringUtil.getPartialMainWords(word);
+			for (ComparablePair<String, Float> partialWord : partialWords) {
+				float factor = partialWord.value;
+				IIndexWord idxWord;
 				synchronized (dict) {
-					w = dict.getWord(wordID);
+					idxWord = dict.getIndexWord(partialWord.key, pos);
 				}
-				List<String> _trace = new LinkedList<String>(trace);
-				// only add "partial node" notice if it actually is only a part
-				if (!w.getLemma().equals(word)) {
-					_trace.add(w.getLemma() + " (partial word)");
+				if (idxWord == null) {
+					continue;
 				}
-				addSynonyms(synonymScores, getHyponyms(w.getSynset(), 3, _trace), factor);
-				addSynonyms(synonymScores, getHypernyms(w.getSynset(), 3, _trace), factor*hypernymPenalty);
-				addSynonym(synonymScores, w.getLemma(), _trace, factor);
-				// Get direct and transitive synonyms
-				addSynonyms(synonymScores, getSynonyms(w, 1, 2, _trace), factor);
-				
-				List<IWordID> rWordIDs = w.getRelatedWords(Pointer.DERIVATIONALLY_RELATED);
-				for (IWordID rWordID : rWordIDs) {
-					IWord rW;
+				// Use hypernyms to find related words, but assign a penalty
+				// as hypernyms are a "bad" way to find synonyms
+				// (human is not a synonym of author, but the other way around)
+				float hypernymPenalty = 0.1f;
+				for (IWordID wordID : idxWord.getWordIDs()) {
+					IWord w;
 					synchronized (dict) {
-						rW = dict.getWord(rWordID);
+						w = dict.getWord(wordID);
 					}
-					List<String> __trace = new LinkedList<String>(_trace);
-					__trace.add(rW.getLemma() + " (related form)");
-					addSynonym(synonymScores, rW.getLemma(), __trace, factor);
-					addSynonyms(synonymScores, getHyponyms(rW.getSynset(), 3, __trace), factor);
-					addSynonyms(synonymScores, getHypernyms(rW.getSynset(), 3, __trace), factor*hypernymPenalty);
-					
+					List<TraceElement> _trace = new LinkedList<TraceElement>(trace);
+					// only add "partial node" notice if it actually is only a part
+					if (!w.getLemma().equals(word)) {
+						_trace.add(new TraceElement(w.getLemma() + " (partial word)", getWordNetUrl(w)));
+					}
+					addSynonyms(synonymScores, getHyponyms(w.getSynset(), 3, _trace), factor);
+					addSynonyms(synonymScores, getHypernyms(w.getSynset(), 3, _trace), factor*hypernymPenalty);
+					addSynonym(synonymScores, w.getLemma(), _trace, factor);
 					// Get direct and transitive synonyms
-					addSynonyms(synonymScores, getSynonyms(rW, 1, 2, __trace));
+					addSynonyms(synonymScores, getSynonyms(w, 1, 2, _trace), factor);
+					
+					List<IWordID> rWordIDs = w.getRelatedWords(Pointer.DERIVATIONALLY_RELATED);
+					for (IWordID rWordID : rWordIDs) {
+						IWord rW;
+						synchronized (dict) {
+							rW = dict.getWord(rWordID);
+						}
+						List<TraceElement> __trace = new LinkedList<TraceElement>(_trace);
+						__trace.add(new TraceElement(rW.getLemma() + " (related form)", getWordNetUrl(rW)));
+						addSynonym(synonymScores, rW.getLemma(), __trace, factor);
+						addSynonyms(synonymScores, getHyponyms(rW.getSynset(), 3, __trace), factor);
+						addSynonyms(synonymScores, getHypernyms(rW.getSynset(), 3, __trace), factor*hypernymPenalty);
+						
+						// Get direct and transitive synonyms
+						addSynonyms(synonymScores, getSynonyms(rW, 1, 2, __trace));
+					}
 				}
 			}
 		}
@@ -173,7 +181,7 @@ public class WordNetConnector {
 		return synonymScores;
 	}
 	
-	public Map<MappedString, Float> getSynonyms(IWord word, int depth, int maxDepth, List<String> trace) {
+	public Map<MappedString, Float> getSynonyms(IWord word, int depth, int maxDepth, List<TraceElement> trace) {
 		Map<MappedString, Float> res = new HashMap<MappedString, Float>();
 		if (depth > maxDepth) {
 			return res;
@@ -189,10 +197,10 @@ public class WordNetConnector {
 			}
 			for (IWord synonym : s.getWords()) {
 				float score = 1.0f - (float)depth / (maxDepth + 1);
-				List<String> _trace = new LinkedList<String>(trace);
+				List<TraceElement> _trace = new LinkedList<TraceElement>(trace);
 				// we don't have to mention that a word is a synonym of itself
 				if (!word.getLemma().equals(synonym.getLemma())) {
-					_trace.add(synonym.getLemma() + " (synonym)");
+					_trace.add(new TraceElement(synonym.getLemma() + " (synonym)", getWordNetUrl(synonym)));
 				}
 				addSynonym(res, synonym.getLemma(), _trace, score);
 				addSynonyms(res, getSynonyms(synonym, depth + 1, maxDepth, _trace));
@@ -201,15 +209,20 @@ public class WordNetConnector {
 		return res;
 	}
 	
-	public Map<MappedString, Float> getHypernyms(ISynset s, int maxDepth, List<String> trace) {
+	public Map<MappedString, Float> getHypernyms(ISynset s, int maxDepth, List<TraceElement> trace) {
 		return getRelatedWords(s, 1, maxDepth, Pointer.HYPERNYM, true, trace);
 	}
 	
-	public Map<MappedString, Float> getHyponyms(ISynset s, int maxDepth, List<String> trace) {
+	public Map<MappedString, Float> getHyponyms(ISynset s, int maxDepth, List<TraceElement> trace) {
 		return getRelatedWords(s, 1, maxDepth, Pointer.HYPONYM, true, trace);
 	}
 	
-	public Map<MappedString, Float> getRelatedWords(ISynset s, int depth, int maxDepth, IPointer relationType, boolean assignDepthPenalty, List<String> trace) {
+	private String getWordNetUrl(IWord w) {
+		String s = w.getLemma();
+		return "http://wordnetweb.princeton.edu/perl/webwn?s=" + s;
+	}
+	
+	public Map<MappedString, Float> getRelatedWords(ISynset s, int depth, int maxDepth, IPointer relationType, boolean assignDepthPenalty, List<TraceElement> trace) {
 		if (depth == maxDepth) {
 			return Collections.emptyMap();
 		}
@@ -225,11 +238,11 @@ public class WordNetConnector {
 			synchronized (dict) {
 				hS = dict.getSynset(sID);
 			}
-			List<String> _trace = new LinkedList<String>(trace);
-			_trace.add(hS.getGloss() + " (" + relationType.getName() + ")");
+			List<TraceElement> _trace = new LinkedList<TraceElement>(trace);
+			_trace.add(new TraceElement(hS.getGloss() + " (" + relationType.getName() + ")", ""));
 			for (IWord h : hS.getWords()) {
-				List<String> __trace = new LinkedList<String>(trace);
-				__trace.add(h.getLemma() + " (" + relationType.getName() + ")");
+				List<TraceElement> __trace = new LinkedList<TraceElement>(trace);
+				__trace.add(new TraceElement(h.getLemma() + " (" + relationType.getName() + ")", getWordNetUrl(h)));
 				addSynonym(res, h.getLemma(), __trace, scoreInThisDepth);
 			}
 			addSynonyms(res, getRelatedWords(hS, depth + 1, maxDepth, relationType, assignDepthPenalty, _trace));

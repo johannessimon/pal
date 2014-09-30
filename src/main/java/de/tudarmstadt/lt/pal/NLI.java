@@ -44,7 +44,14 @@ public class NLI {
 				if (sentence == null) {
 					break;
 				}
-				run(sentence);
+				Collection<Answer> answers = run(sentence);
+				if (answers != null) {
+					for (Answer a : answers ) {
+						System.out.println(a.value);
+					}
+				} else {
+					System.out.println("Sorry, I couldn't interpret your question :(");
+				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -57,6 +64,9 @@ public class NLI {
 		SemanticGraph dependencies = depParser.parse(text);
 		Query pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
 		Query query = tripleMapper.getBestSPARQLQuery(pseudoQuery);
-		return kb.query(query);
+		if (query != null) {
+			return kb.query(query);
+		}
+		return null;
 	}
 }

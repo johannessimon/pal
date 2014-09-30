@@ -9,14 +9,24 @@ import java.util.List;
  */
 public class MappedString {
 	public String value;
-	public List<String> trace = new LinkedList<String>();
+	public List<TraceElement> trace = new LinkedList<TraceElement>();
+	
+	public static class TraceElement {
+		public String value;
+		public String url;
+		public TraceElement(String value, String url) {
+			this.value = value;
+			this.url = url;
+		}
+		@Override public String toString() { return value + " (" + url + ")"; }
+	}
 	
 	public MappedString(String word) {
 		this.value = word;
-		trace.add(word);
+		trace.add(new TraceElement(word, ""));
 	}
 	
-	public MappedString(String word, List<String> trace) {
+	public MappedString(String word, List<TraceElement> trace) {
 		this.value = word;
 		this.trace.addAll(trace);
 	}

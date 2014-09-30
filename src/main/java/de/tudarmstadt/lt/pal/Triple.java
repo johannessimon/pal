@@ -3,6 +3,8 @@ package de.tudarmstadt.lt.pal;
 import java.util.Arrays;
 import java.util.List;
 
+import de.tudarmstadt.lt.pal.MappedString.TraceElement;
+
 
 /**
  * Represents a triple that can be used in a SPARQL query. May contain
@@ -12,7 +14,7 @@ public class Triple implements Cloneable {
 	
 	public static abstract class Element implements Cloneable {
 		public String name;
-		public List<String> trace;
+		public List<TraceElement> trace;
 		
 		public abstract boolean isConstant();
 		
@@ -99,7 +101,7 @@ public class Triple implements Cloneable {
 			this.name = name;
 			this.unmappedType = unmappedType;
 			// A variable name does not have a real derivation trace
-			this.trace = Arrays.asList(name);
+			this.trace = Arrays.asList(new TraceElement(name, ""));
 		}
 		
 		@Override
