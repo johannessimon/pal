@@ -107,9 +107,9 @@ public class QueryMapper {
 
 			res.add(new ComparablePair<TypeConstraint, Float>(new TypeConstraint(
 					TypeConstraint.BasicType.Resource,
-					new MappedString("schema:Organisation", Arrays.asList(
+					new MappedString("schema:Organization", Arrays.asList(
 							new TraceElement(var.name, ""),
-							new TraceElement("schema:Organisation (\"who\")", "http://schema.org/Organisation")))), 1.0f));
+							new TraceElement("schema:Organization (\"who\")", "http://schema.org/Organization")))), 1.0f));
 			break;
 		case Place:
 			res.add(new ComparablePair<TypeConstraint, Float>(new TypeConstraint(
