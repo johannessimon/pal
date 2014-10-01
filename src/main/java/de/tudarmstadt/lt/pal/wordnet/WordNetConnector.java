@@ -25,6 +25,9 @@ import edu.mit.jwi.item.IWordID;
 import edu.mit.jwi.item.POS;
 import edu.mit.jwi.item.Pointer;
 
+/**
+ * Helper class to retrieve semantically similar or related words along with scores from WordNet
+ */
 public class WordNetConnector {
 	IDictionary dict;
 	
