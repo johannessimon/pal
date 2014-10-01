@@ -34,6 +34,7 @@ import de.tudarmstadt.lt.pal.Query;
 import de.tudarmstadt.lt.pal.QueryMapper;
 import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
 import de.tudarmstadt.lt.pal.stanford.StanfordPseudoQueryBuilder;
+import de.tudarmstadt.lt.pal.util.ComparablePair;
 import de.tudarmstadt.lt.pal.util.ParallelParameterized;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.semgraph.SemanticGraph;
@@ -41,43 +42,45 @@ import edu.stanford.nlp.semgraph.SemanticGraph;
 @RunWith(ParallelParameterized.class)
 public class QALD2TestWithoutAnswers {
 	QALD2Entry entry;
-	KnowledgeBaseConnector kb;
-	QueryMapper tripleMapper;
+	static KnowledgeBaseConnector kb;
+	static QueryMapper tripleMapper;
 	StanfordCoreNLP pipeline;
-	StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder();
-	StanfordDependencyParser depParser = new StanfordDependencyParser();
+	static StanfordPseudoQueryBuilder pseudoQueryBuilder = new StanfordPseudoQueryBuilder();
+	static StanfordDependencyParser depParser = new StanfordDependencyParser();
 	private static PrecisionRecallMeter prMeter = new PrecisionRecallMeter();
 	
+	public final static String CHALLENGE_NAME = "qald2";
 	public final static String DATASET_NAME = "dbpedia-train";
+//	public final static String DATASET_NAME = "qald-4_multilingual_test";
 
 	static Document answerDoc;
 	static Element datasetElement;
 	
 	@BeforeClass
-	public static void prepare() {
+	public static void prepare() throws IOException {
 		answerDoc = DocumentHelper.createDocument();
 		datasetElement = answerDoc.addElement("dataset").addAttribute("id", DATASET_NAME);
+		kb = new KnowledgeBaseConnector("src/main/resources/sparql_endpoints/dbpedia-37-local.properties");
+		tripleMapper = new QueryMapper(kb);
 	}
 	
 	@AfterClass
 	public static void finish() throws IOException {
         OutputFormat format = OutputFormat.createPrettyPrint();
-		XMLWriter writer = new XMLWriter(new FileWriter("/Volumes/Bill/Documents/Uni/Watson-Projekt/qald2/processed/" + DATASET_NAME + "-answers.xml"), format);
+		XMLWriter writer = new XMLWriter(new FileWriter("/Volumes/Bill/Documents/Uni/Watson-Projekt/" + CHALLENGE_NAME + "/processed/" + DATASET_NAME + "-answers.xml"), format);
 		writer.write(answerDoc);
 		writer.close();
 	}
 	
 	public QALD2TestWithoutAnswers(String question, QALD2Entry entry) throws IOException {
 		this.entry = entry;
-		kb = new KnowledgeBaseConnector("src/main/resources/sparql_endpoints/dbpedia-37-local.properties");
-		tripleMapper = new QueryMapper(kb);
 	}
 	
 	@Parameterized.Parameters(name="{0}")
 	public static Collection<Object> initialize() throws ParserConfigurationException, SAXException, IOException {
 		List<Object> params = new LinkedList<Object>();
 		Collection<QALD2Entry> entries = QALD2XMLParser.parse(
-				"/Volumes/Bill/Documents/Uni/Watson-Projekt/qald2/" + DATASET_NAME + ".xml",
+				"/Volumes/Bill/Documents/Uni/Watson-Projekt/" + CHALLENGE_NAME + "/" + DATASET_NAME + ".xml",
 				null);
 
 		for (QALD2Entry entry : entries) {
@@ -87,23 +90,20 @@ public class QALD2TestWithoutAnswers {
 		return params;
 	}
 	
-	String determineAnswerType(String answer) {
-		if (answer.startsWith("http://")) {
-			return "resource";
-		}
-		return "UNKNOWN";
-	}
-	
-	String determineAnswerDataType(String answer) {
-		if (answer.startsWith("http://")) {
-			return "uri";
-		}
-		return "UNKNOWN";
-	}
-	
 	@Test
 	public void test() throws ParseException {
-		prMeter.newTestCase();
+		
+		Set<String> expectedAnswers = new HashSet<String>();
+		if (entry.query != null && !entry.query.contains("OUT OF SCOPE")) {
+			Set<String> varsToIgnore = new HashSet<String>();
+			varsToIgnore.add("string");
+			expectedAnswers.addAll(kb.query(entry.query, varsToIgnore));
+		}
+		prMeter.newTestCase(expectedAnswers);
+		if (entry.query != null && entry.query.contains("OUT OF SCOPE")) {
+			prMeter.addWrongMeasurement();
+			fail("OUT OF SCOPE not implemented yet");
+		}
 
 		Element q;
 		synchronized(datasetElement) {
@@ -121,23 +121,20 @@ public class QALD2TestWithoutAnswers {
 		assertTrue(pseudoQuery.vars != null);
 		assertTrue(pseudoQuery.vars.size() > 0);
 		assertTrue(pseudoQuery.focusVar != null);
-		Query query = tripleMapper.getBestSPARQLQuery(pseudoQuery);
-		assertTrue(query != null);
+		ComparablePair<Query, Float> scoredQuery = tripleMapper.getBestSPARQLQuery(pseudoQuery);
+		assertTrue(scoredQuery != null);
+		if (scoredQuery.value < 0.01) {
+			fail("Answer confidence too low!");
+		}
+		Query query = scoredQuery.key;
 		System.out.println("QUERY: " + query);
 		System.out.println("======= ANSWER =======");
 		String focusVar = pseudoQuery.focusVar.name;
 		
-		Set<String> expectedAnswers = new HashSet<String>();
-		
-		if (entry.query != null && !entry.query.contains("OUT OF SCOPE")) {
-			Set<String> varsToIgnore = new HashSet<String>();
-			varsToIgnore.add("string");
-			expectedAnswers.addAll(kb.query(entry.query, varsToIgnore));
-		}
-		
 		try {
 			System.out.println("?" + focusVar + ":");
 			Collection<Answer> answers = kb.query(query);
+			assertTrue(answers != null);
 			assertTrue(!answers.isEmpty());
 			Answer firstAnswer = answers.iterator().next();
 			String answerType = firstAnswer.dataType.toString().toLowerCase();

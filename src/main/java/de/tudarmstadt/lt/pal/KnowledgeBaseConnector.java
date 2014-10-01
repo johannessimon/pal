@@ -333,7 +333,8 @@ public class KnowledgeBaseConnector {
 	 * Returns either the best-matching type for the name candidates or null
 	 */
 	ComparablePair<MappedString, Float> getType(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
-		List<ComparablePair<MappedString, Float>> candidates = getTypeCandidates(nameCandidates);
+		int numCandidates = 10;
+		List<ComparablePair<MappedString, Float>> candidates = getTypeCandidates(nameCandidates, numCandidates);
 		float bestScore = 0.0f;
 		if (candidates.size() > 0) {
 			// list is sorted in descending order
@@ -359,7 +360,7 @@ public class KnowledgeBaseConnector {
 	 * Constructs a list of type candidates from {@link KnowledgeBaseConnector#classesInUse} that
 	 * match the name candidates
 	 */
-	private List<ComparablePair<MappedString, Float>> getTypeCandidates(Collection<ComparablePair<MappedString, Float>> nameCandidates) {
+	private List<ComparablePair<MappedString, Float>> getTypeCandidates(Collection<ComparablePair<MappedString, Float>> nameCandidates, int limit) {
 		log.debug("Searching types for name candidates: " + nameCandidates);
 		List<ComparablePair<MappedString, Float>> types = new LinkedList<ComparablePair<MappedString, Float>>();
 		for (ComparablePair<MappedString, Float> c : nameCandidates) {
@@ -376,6 +377,9 @@ public class KnowledgeBaseConnector {
 			}
 		}
 		Collections.sort(types);
+		if (types.size() > limit) {
+			types = types.subList(0, limit);
+		}
 		log.debug("Type candidates: " + types);
 		return types;
 	}
@@ -437,7 +441,6 @@ public class KnowledgeBaseConnector {
 		List<ComparablePair<MappedString, Float>> candidates = resourceCandidateCache.get(name);
 		if (candidates == null) {
 			candidates = new LinkedList<ComparablePair<MappedString, Float>>();
-			resourceCandidateCache.put(name, candidates);
 			log.debug("Searching resources... [" + name + "]");
 			if (name.contains("#")) {
 				int sepIndex = name.indexOf('#');
@@ -451,7 +454,7 @@ public class KnowledgeBaseConnector {
 	                               + "  UNION\n"
 	                               + "  { ?subject rdfs:label ?name . FILTER(lang(?name) = \"\" || langMatches(lang(?name), \"en\")) }\n"
 					               + "} \n"
-						           + "LIMIT " + limit;
+						           + "LIMIT 1000";
 				try {
 					QueryExecution qexec = getQueryExec(queryString);
 					ResultSet results = qexec.execSelect();
@@ -486,6 +489,12 @@ public class KnowledgeBaseConnector {
 			}
 	
 			Collections.sort(candidates);
+			
+			if (candidates.size() > limit) {
+				candidates = candidates.subList(0, limit);
+			}
+
+			resourceCandidateCache.put(name, candidates);
 			log.debug("Done searching resources. Results: " + candidates);
 		}
 		return candidates;
@@ -578,10 +587,10 @@ public class KnowledgeBaseConnector {
 			queryStr += t.predicate.sparqlString() + " ";
 			queryStr += t.object.sparqlString() + " .\n";
 		}
-		for (Variable var : q.vars.values()) {
+		if (q.focusVar != null) {
 			queryStr += "   OPTIONAL { ";
-			queryStr += "{ " + var.sparqlString() + " rdfs:label ?string . FILTER (lang(?string)=\"en\" || lang(?string)=\"\") } UNION";
-			queryStr += "{ " + var.sparqlString() + " foaf:name ?string . FILTER (lang(?string)=\"en\" || lang(?string)=\"\") }";
+			queryStr += "{ " + q.focusVar.sparqlString() + " rdfs:label ?string . FILTER (lang(?string)=\"en\" || lang(?string)=\"\") } UNION";
+			queryStr += "{ " + q.focusVar.sparqlString() + " foaf:name ?string . FILTER (lang(?string)=\"en\" || lang(?string)=\"\") }";
 			queryStr += "} .\n";
 		}
 

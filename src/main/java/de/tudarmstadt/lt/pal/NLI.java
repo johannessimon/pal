@@ -8,6 +8,7 @@ import java.util.Collection;
 import de.tudarmstadt.lt.pal.KnowledgeBaseConnector.Answer;
 import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
 import de.tudarmstadt.lt.pal.stanford.StanfordPseudoQueryBuilder;
+import de.tudarmstadt.lt.pal.util.ComparablePair;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 
 /**
@@ -63,7 +64,8 @@ public class NLI {
 	public Collection<Answer> run(String text) {
 		SemanticGraph dependencies = depParser.parse(text);
 		Query pseudoQuery = pseudoQueryBuilder.buildPseudoQuery(dependencies);
-		Query query = tripleMapper.getBestSPARQLQuery(pseudoQuery);
+		ComparablePair<Query, Float> scoredQuery = tripleMapper.getBestSPARQLQuery(pseudoQuery);
+		Query query = scoredQuery.key;
 		if (query != null) {
 			return kb.query(query);
 		}

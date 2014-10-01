@@ -65,8 +65,13 @@ public class QALD2XMLParser {
 				qald2Entry.onlydbo = Boolean.parseBoolean(entryElement.getAttribute("onlydbo"));
 				
 				NodeList questionStringNodes = entryElement.getElementsByTagName("string");
-				if (questionStringNodes.getLength() > 0) {
-					qald2Entry.question = questionStringNodes.item(0).getTextContent().trim();
+				for (int j = 0; j < questionStringNodes.getLength(); j++) {
+					Element questionStringNode = (Element)questionStringNodes.item(j);
+					if (questionStringNode.hasAttribute("lang") && !"en".equals(questionStringNode.getAttribute("lang"))) {
+						continue;
+					}
+					qald2Entry.question = questionStringNode.getTextContent().trim();
+					break;
 				}
 				
 				NodeList queryNodes = entryElement.getElementsByTagName("query");

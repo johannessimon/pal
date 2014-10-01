@@ -13,11 +13,17 @@ public class PrecisionRecallMeter {
 	private int partiallyCorrect = 0;
 	private int incorrect = 0;
 	
-	public void newTestCase() {
+	private int documentsAnswered = 0;
+	private int documentsAnsweredCorrect = 0;
+	private int documentsGold = 0;
+	
+	public void newTestCase(Set<String> expected) {
 		measurements++;
+		documentsGold += expected.size();
 	}
 	
 	public void addMeasurement(Set<String> expected, Set<String> actual) {
+		documentsAnswered += actual.size();
 		if (expected.isEmpty()) {
 			addWrongMeasurement();
 			return;
@@ -25,6 +31,7 @@ public class PrecisionRecallMeter {
 		nonEmptyMeasurements++;
 		Set<String> correctActual = new HashSet<String>(actual);
 		correctActual.retainAll(expected);
+		documentsAnsweredCorrect += correctActual.size();
 		float _recall = (float)correctActual.size() / expected.size();
 		float _precision = (float)correctActual.size() / actual.size();
 		recall  += _recall;
@@ -47,13 +54,25 @@ public class PrecisionRecallMeter {
 		incorrect++;
 	}
 	
+	private float f1(float precision, float recall) {
+		return 2*(precision*recall)/(precision+recall);
+	}
+	
 	public void printResults() {
 		int emptyMeasurements = measurements - nonEmptyMeasurements;
 		// All empty measurements mean recall of 0 and precision of 1
 		precision += emptyMeasurements;
-		System.out.println("Recall: " + recall / measurements);
-		System.out.println("Precision: " + precision / measurements);
-		System.out.println("F1 score: " + fMeasure / measurements);
+		float microRecall = recall / measurements;
+		float microPrecision = precision / measurements;
+		float macroRecall = (float)documentsAnsweredCorrect / documentsGold;
+		float macroPrecision = (float)documentsAnsweredCorrect / documentsAnswered;
+		System.out.println("Micro-averaged recall: " + microRecall);
+		System.out.println("Micro-averaged precision: " + microPrecision);
+		System.out.println("Micro-averaged F1: " + fMeasure / measurements);
+		System.out.println("F1 score of micro-averages: " + f1(microPrecision, microRecall));
+		System.out.println("Macro-averaged precision: " + macroPrecision);
+		System.out.println("Macro-averaged recall: " + macroRecall);
+		System.out.println("F1 score of macro-averages: " + f1(macroPrecision, macroRecall));
 		System.out.println("Correct: " + correct);
 		System.out.println("Partially correct: " + partiallyCorrect);
 		System.out.println("Incorrect: " + incorrect);

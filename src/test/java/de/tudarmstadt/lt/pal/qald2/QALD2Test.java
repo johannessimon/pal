@@ -30,6 +30,7 @@ import de.tudarmstadt.lt.pal.Query;
 import de.tudarmstadt.lt.pal.QueryMapper;
 import de.tudarmstadt.lt.pal.stanford.StanfordDependencyParser;
 import de.tudarmstadt.lt.pal.stanford.StanfordPseudoQueryBuilder;
+import de.tudarmstadt.lt.pal.util.ComparablePair;
 import de.tudarmstadt.lt.pal.util.DateUtil;
 import de.tudarmstadt.lt.pal.util.ParallelParameterized;
 import edu.stanford.nlp.semgraph.SemanticGraph;
@@ -81,7 +82,8 @@ public class QALD2Test {
 		assertTrue(pseudoQuery.vars != null);
 		assertTrue(pseudoQuery.vars.size() > 0);
 		assertTrue(pseudoQuery.focusVar != null);
-		Query query = tripleMapper.getBestSPARQLQuery(pseudoQuery);
+		ComparablePair<Query, Float> scoredQuery = tripleMapper.getBestSPARQLQuery(pseudoQuery);
+		Query query = scoredQuery.key;
 		assertTrue(query != null);
 		try {
 			Collection<Answer> queryAnswers = kb.query(query);

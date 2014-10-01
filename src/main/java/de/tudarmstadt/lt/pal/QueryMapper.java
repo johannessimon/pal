@@ -51,13 +51,8 @@ public class QueryMapper {
 		List<ComparablePair<MappedString, Float>> candidates = null;
 		
 		if (e != null && e.isConstant()) {
-			// Get scores for 100 resource candidates and choose best N
-			int numCandidates = 1000;
-			int numCandidatesFiltered = 5;
+			int numCandidates = 5;
 			candidates = kb.getResourceCandidates(e.name, numCandidates);
-			if (candidates.size() > numCandidatesFiltered) {
-				candidates = candidates.subList(0, numCandidatesFiltered);
-			}
 		}
 		return candidates;
 	}
@@ -165,7 +160,7 @@ public class QueryMapper {
 	 * Generates a list of candidates SPARQL queries from the given pseudo query and returns the first
 	 * query that yields any results (the latter being a way of filtering out non-sense queries)
 	 */
-	public Query getBestSPARQLQuery(Query pseudoQuery) {
+	public ComparablePair<Query, Float> getBestSPARQLQuery(Query pseudoQuery) {
 		List<ComparablePair<Query, Float>> queryCandidates = buildSPARQLQuery(pseudoQuery);
 		final int MAX_NUM_QUERY_CANDIDATES = 100;
 		if (queryCandidates.size() > MAX_NUM_QUERY_CANDIDATES) {
@@ -178,7 +173,7 @@ public class QueryMapper {
 		for (ComparablePair<Query, Float> query : queryCandidates) {
 			Collection<Answer> answer = kb.query(query.key);
 			if (!answer.isEmpty()) {
-				return query.key;
+				return query;
 			}
 		}
 		return null;

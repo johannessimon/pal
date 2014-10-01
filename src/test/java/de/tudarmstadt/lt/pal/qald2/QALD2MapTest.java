@@ -26,6 +26,7 @@ import de.tudarmstadt.lt.pal.KnowledgeBaseConnector;
 import de.tudarmstadt.lt.pal.KnowledgeBaseConnector.Answer;
 import de.tudarmstadt.lt.pal.Query;
 import de.tudarmstadt.lt.pal.QueryMapper;
+import de.tudarmstadt.lt.pal.util.ComparablePair;
 import de.tudarmstadt.lt.pal.util.DateUtil;
 
 @RunWith(Parameterized.class)
@@ -60,7 +61,8 @@ public class QALD2MapTest {
 	public void test() throws ParseException {
 		Set<Answer> answers = new HashSet<Answer>();
 
-		Query query = tripleMapper.getBestSPARQLQuery(entry.pseudoQuery);
+		ComparablePair<Query, Float> scoredQuery = tripleMapper.getBestSPARQLQuery(entry.pseudoQuery);
+		Query query = scoredQuery.key;
 		assertTrue(query != null);
 		System.out.println("QUERY: " + query);
 		System.out.println("======= ANSWER =======");
