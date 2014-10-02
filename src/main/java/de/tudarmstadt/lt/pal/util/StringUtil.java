@@ -9,6 +9,10 @@ public class StringUtil {
 	 * Tests if <code>haystack</code> has word parts starting with <code>needle</code>
 	 */
 	public static boolean hasPartStartingWith(String haystack, String needle) {
+		// more efficient pre-filter
+		if (!haystack.contains(needle)) {
+			return false;
+		}
 		// ("abc def", "abc") -> match
 		// ("abc def", "def") -> match
 		// ("abc def", "de") -> match
@@ -20,6 +24,10 @@ public class StringUtil {
 	 * Tests if <code>haystack</code> has word parts starting with <code>needle</code>
 	 */
 	public static boolean hasPart(String haystack, String needle) {
+		// more efficient pre-filter
+		if (!haystack.contains(needle)) {
+			return false;
+		}
 		// ("abc def", "abc") -> match
 		// ("abc def", "def") -> match
 		// ("abc def", "de") -> no match

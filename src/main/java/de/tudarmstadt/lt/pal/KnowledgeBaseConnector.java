@@ -438,14 +438,14 @@ public class KnowledgeBaseConnector {
 	 * <code>limit</code> results
 	 */
 	List<ComparablePair<MappedString, Float>> getResourceCandidates(String name, int limit) {
+		if (name.contains("#")) {
+			int sepIndex = name.indexOf('#');
+			name = name.substring(0, sepIndex);
+		}
 		List<ComparablePair<MappedString, Float>> candidates = resourceCandidateCache.get(name);
 		if (candidates == null) {
 			candidates = new LinkedList<ComparablePair<MappedString, Float>>();
 			log.debug("Searching resources... [" + name + "]");
-			if (name.contains("#")) {
-				int sepIndex = name.indexOf('#');
-				name = name.substring(0, sepIndex);
-			}
 			{
 				String queryString = "SELECT DISTINCT ?subject ?name WHERE { \n"
 			                       + "  { ?subject foaf:name ?name . " + fillTextIndexSearchPattern(textIndexSearchPattern, "?name", name) + "} UNION\n"

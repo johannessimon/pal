@@ -9,4 +9,4 @@ z y ?	* subj *
 x y z	* agent|comp|prep *
 ? y z	* agent|comp|prep *
 ? y z	* dep *#w*
-? ? z	* mod *
+? ? z	*#n* mod * // modifiers of nouns
