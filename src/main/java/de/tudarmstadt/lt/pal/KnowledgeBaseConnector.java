@@ -816,11 +816,11 @@ public class KnowledgeBaseConnector {
 			boolean pIsObjectProperty = objectProperties.contains(pUri);
 			float propertyTypeScore = 1.0f;
 			// We know that the object is a resource, exclude all non-object properties in advance (e.g. DBPedia properties)
-			if (objectURI != null && !pIsObjectProperty) {
-				propertyTypeScore = 0.1f;
-			}
+//			if (objectURI != null && !pIsObjectProperty) {
+//				propertyTypeScore = 0.1f;
+//			}
 			// Slightly prefer object properties over non-object properties in other cases
-			else if (pIsObjectProperty) {
+			/*else */if (pIsObjectProperty) {
 				propertyTypeScore = 1.01f;
 			}
 			

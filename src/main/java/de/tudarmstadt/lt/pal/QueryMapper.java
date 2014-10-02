@@ -189,24 +189,29 @@ public class QueryMapper {
 		// penalty for one missing type constraint
 		final float NO_TYPE_CONSTRAINT_PENALTY = 0.1f;
 		Variable[] vars = pseudoQuery.vars.values().toArray(new Variable[0]);
+		Map<Integer, String> varNames = new HashMap<Integer, String>();
 		int numVars = vars.length;
+		for (int i = 0; i < numVars; i++) {
+			varNames.put(i, vars[i].name);
+		}
 		// penalty for all type constraints missing
 		final float NO_TYPE_CONSTRAINT_AT_ALL_PENALTY = (int)Math.round(Math.pow(NO_TYPE_CONSTRAINT_PENALTY, numVars));
 		
 		// for each variable, generate a new pseudo query for each possible type constraint
 		// (no type, type 1, type 2, ...)
 		for (int i = 0; i < numVars; i++) {
+			String varName = varNames.get(i);
 			List<ComparablePair<Query, Float>> _queryCandidates = new LinkedList<ComparablePair<Query, Float>>();
 			Collection<ComparablePair<TypeConstraint, Float>> tcs = mapVariableType(vars[i]);
 			tcs.add(null); // also consider no type constraint (convenient for processing in loop)
 			for (ComparablePair<TypeConstraint, Float> tc : tcs) {
 				for (ComparablePair<Query, Float> q : queryCandidates) {
 					Query _q = (Query)q.key.clone();
-					Variable[] _vars = _q.vars.values().toArray(new Variable[0]);
+					Variable var = _q.vars.get(varName);
 					float score = NO_TYPE_CONSTRAINT_PENALTY;
 					if (tc != null) {
 						score = q.value * tc.value;
-						_vars[i].mappedType = tc.key;
+						var.mappedType = tc.key;
 					}
 					if (score > NO_TYPE_CONSTRAINT_AT_ALL_PENALTY) {
 						_queryCandidates.add(new ComparablePair<Query, Float>(_q, score));
